@@ -82,10 +82,10 @@ Source PRD: `airbnb-prd.md`
     - [x] 4.2 Add a listing-count column and a low-confidence flag at n < 100 (req 38).
     - [x] 4.3 Populate `INDICATOR_FAMILIES` in `config.py` now that every indicator column name is known — needed by task 6.0's weighting.
     - [x] 4.4 Implement exclusion: filter low-confidence neighbourhoods from ranked output, clustering, and maps, while retaining all 264 in the exported table (req 39).
-    - [ ] 4.5 Write `excluded_neighbourhoods.md` with the excluded list, listing counts, total listings removed, and the three stated reasons — rate instability, mechanical HHI inflation, clustering distortion (req 40).
+    - [x] 4.5 Write `excluded_neighbourhoods.md` with the excluded list, listing counts, total listings removed, and the three stated reasons — rate instability, mechanical HHI inflation, clustering distortion (req 40).
     - [ ] 4.6 Run the full ranking and clustering at n = 50, 100, and 200 and report how many neighbourhoods change cluster assignment between thresholds (req 41).
-    - [ ] 4.7 Export the neighbourhood table to `outputs/neighbourhood_indicators.csv` (req 42).
-    - [ ] 4.8 Write `tests/test_aggregate.py` for exclusion logic and threshold behaviour.
+    - [x] 4.7 Export the neighbourhood table to `outputs/neighbourhood_indicators.csv` (req 42). All 264 rows; index written as a `neighbourhood` column; no `float_format` (full round-trip precision, byte-identical reruns verified).
+    - [x] 4.8 Write `tests/test_aggregate.py` for exclusion logic and threshold behaviour. 10 tests: feature-column contract, default/override threshold, non-mutation, sensitivity monotonicity, `feature_frame` null handling, CSV export retains flagged neighbourhoods + byte-identical rerun.
 
 - [ ] 5.0 Hedonic price regression
 

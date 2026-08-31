@@ -112,3 +112,140 @@ def feature_frame(tbl: pd.DataFrame, threshold: int | None = None) -> pd.DataFra
             f"retained neighbourhoods have null features: {nulls[nulls > 0].to_dict()}"
         )
     return frame
+
+
+def export_table(tbl: pd.DataFrame, path=None) -> None:
+    """
+    PRD req 42 (and req 39: every one of the 264 neighbourhoods, not just
+    the retained ones). Writes the full table to
+    `outputs/neighbourhood_indicators.csv`.
+
+    Column order is the table as `build_table` assembled it: the count /
+    flag / geo columns, then the eight indicator families in
+    `INDICATOR_FAMILIES` order with their descriptive-only siblings, then
+    the topic loadings. Rows are alphabetical by neighbourhood (the
+    groupby order upstream).
+
+    No `float_format` is applied - pandas writes full round-trip precision,
+    which is deterministic given deterministic inputs, so reruns are
+    byte-identical (success metric 10). Null indicator values for excluded
+    neighbourhoods are written as empty fields.
+    """
+    path = path or (config.OUTPUT_DIR / "neighbourhood_indicators.csv")
+    tbl.to_csv(path, index=True, index_label="neighbourhood", encoding="utf-8")
+    print(f"[aggregate] neighbourhood table -> {path} "
+          f"({tbl.shape[0]} rows x {tbl.shape[1]} columns)")
+
+
+def write_exclusion_report(
+    tbl: pd.DataFrame,
+    sensitivity: pd.DataFrame | None = None,
+    path=None,
+) -> None:
+    """
+    PRD req 40: the excluded-neighbourhood report - full list with listing
+    counts, the total listings the exclusion removes, and the three stated
+    reasons for the n >= 100 threshold.
+
+    `sensitivity` is the n = 50 / 100 / 200 cluster-stability table from
+    task 4.6 (req 41). Passed None, the report says that run is pending
+    rather than omitting the section.
+    """
+    n = config.MIN_LISTINGS_PER_NEIGHBOURHOOD
+    total_listings = int(tbl["listing_count"].sum())
+    excluded = tbl[tbl["low_confidence"]].sort_values(
+        ["listing_count"], ascending=False, kind="stable"
+    )
+    removed = int(excluded["listing_count"].sum())
+    pct = 100 * removed / total_listings
+
+    # Concrete figures for the reasons, taken from the actual excluded set.
+    smallest = int(excluded["listing_count"].min())
+    near_miss = excluded[excluded["listing_count"] >= n - 10]
+
+    lines = [
+        "# Excluded Neighbourhoods",
+        "",
+        f"The neighbourhood table retains all **{len(tbl)}** neighbourhoods. "
+        f"Ranked tables, clustering, and maps use only the "
+        f"**{int((~tbl['low_confidence']).sum())}** with at least **{n}** "
+        f"listings. This report covers the **{len(excluded)}** that are "
+        "excluded from those outputs.",
+        "",
+        "## What the exclusion removes",
+        "",
+        f"- Neighbourhoods excluded: **{len(excluded)}** of {len(tbl)} "
+        f"({100 * len(excluded) / len(tbl):.0f}%)",
+        f"- Listings in excluded neighbourhoods: **{removed:,}** of "
+        f"{total_listings:,} (**{pct:.1f}%**)",
+        f"- Excluded neighbourhoods hold **{smallest}** to "
+        f"**{int(excluded['listing_count'].max())}** listings each; "
+        f"{len(near_miss)} sit within 10 of the threshold "
+        f"({', '.join(f'{ix} ({int(r)})' for ix, r in near_miss['listing_count'].items())}).",
+        "",
+        f"The exclusion trades {pct:.1f}% of listing volume for indicator "
+        "stability. The retained neighbourhoods still cover "
+        f"{100 - pct:.1f}% of the market by listing count.",
+        "",
+        f"## Why n >= {n}",
+        "",
+        "Three problems affect small neighbourhoods, and all three get worse "
+        "as n falls.",
+        "",
+        "### (a) Rate instability",
+        "",
+        "Every share indicator - entire-home share, 30-night-minimum share, "
+        "no-review share - can only take values that are multiples of 1/n. A "
+        f"neighbourhood with 12 listings produces entire-home shares in steps "
+        "of 8.3%, and moving one listing shifts the value by that much. The "
+        "ranking would then order neighbourhoods partly on which side of a "
+        "rounding step they happen to land.",
+        "",
+        "### (b) Mechanical HHI inflation",
+        "",
+        "The Herfindahl-Hirschman index has a floor of 1/n. A 10-listing "
+        "neighbourhood cannot score below 0.10 even if all 10 hosts are "
+        "distinct - it would read as moderately concentrated purely from "
+        "being small. Host concentration is one of the eight indicator "
+        "families, so this pushes small neighbourhoods toward the "
+        '"commercialised" end of the segmentation as an artifact of size.',
+        "",
+        "### (c) Clustering distortion",
+        "",
+        "K-means minimises within-cluster variance. A small neighbourhood "
+        "with an extreme indicator value - easy to produce when n is small - "
+        "pulls a centroid toward itself and can end up alone in its own "
+        "cluster, spending a segment on noise instead of a real market type.",
+        "",
+        "## Threshold sensitivity (req 41)",
+        "",
+    ]
+
+    if sensitivity is None:
+        lines += [
+            "_Pending: the n = 50 / 100 / 200 cluster-stability comparison is "
+            "produced by task 4.6 once the clustering stage (task 6.0) exists. "
+            "It will report how many neighbourhoods change cluster assignment "
+            "between thresholds; if that number is small, the choice of 100 is "
+            "not load-bearing._",
+            "",
+        ]
+    else:
+        lines += [sensitivity.to_markdown(index=False), ""]
+
+    lines += [
+        f"## Full list of excluded neighbourhoods ({len(excluded)})",
+        "",
+        "| Neighbourhood | Listings | Group |",
+        "|---|---:|---|",
+    ]
+    for name, row in excluded.iterrows():
+        lines.append(
+            f"| {name} | {int(row['listing_count'])} | {row['neighbourhood_group']} |"
+        )
+    lines.append("")
+
+    path = path or (config.OUTPUT_DIR / "excluded_neighbourhoods.md")
+    path.write_text("\n".join(lines), encoding="utf-8")
+    print(f"[aggregate] exclusion report -> {path} "
+          f"({len(excluded)} neighbourhoods, {pct:.1f}% of listings)")
