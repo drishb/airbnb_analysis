@@ -89,9 +89,9 @@ Source PRD: `airbnb-prd.md`
 
 - [ ] 5.0 Hedonic price regression
 
-    - [ ] 5.1 Build the model frame: `log_price` against room type, minimum nights, availability, host listing count, review count, and neighbourhood group, on all listings rather than only retained neighbourhoods (req 43, 48).
-    - [ ] 5.2 Fit OLS with HC3 robust standard errors (req 44).
-    - [ ] 5.3 Write the coefficient table with standard errors, t-statistics, p-values, R-squared, and n to `outputs/regression_summary.txt` (req 45).
+    - [x] 5.1 Build the model frame: `log_price` against room type, minimum nights, availability, host listing count, review count, and neighbourhood group, on all listings rather than only retained neighbourhoods (req 43, 48). `src/regression.py`: `FORMULA` (categoricals with explicit reference levels — Entire home/apt, City of Los Angeles) + `build_model_frame` (33,067 listings, 7 cols, null-checked). Response is `log_price` = log(price_winsorized).
+    - [x] 5.2 Fit OLS with HC3 robust standard errors (req 44). `fit_model(frame)` -> HC3 at fit time. n=33,067, R^2=0.330, adj R^2=0.329; all 9 coefficients significant at p<0.05. **R^2 below success-metric-3's 0.35 bar** — the neighbourhood-fixed-effects variant (5.6) is expected to clear it.
+    - [x] 5.3 Write the coefficient table with standard errors, t-statistics, p-values, R-squared, and n to `outputs/regression_summary.txt` (req 45). `write_summary(results)`: annotated header (formula, reference levels, HC3 note) + `statsmodels` summary. Robust cov -> statistic is asymptotic z, labelled as such.
     - [ ] 5.4 Convert log coefficients to approximate percentage price effects and include both forms in the output (req 47).
     - [ ] 5.5 Produce residuals-vs-fitted and Q-Q diagnostic plots (req 46).
     - [ ] 5.6 Decide the open question on neighbourhood fixed effects: fit with and without 264 dummies, compare adjusted R-squared, and record the choice (PRD §9.2).

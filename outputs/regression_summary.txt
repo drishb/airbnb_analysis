@@ -1,0 +1,52 @@
+HEDONIC LOG-PRICE REGRESSION
+==============================================================================
+
+PRD req 43-48. Listing-level OLS over every cleaned listing — no
+neighbourhood exclusion (req 48). Response: log(price_winsorized),
+winsorised at the 1st/99th percentile per req 4.
+Standard errors: heteroskedasticity-robust (HC3), so the reported
+per-coefficient statistic is the asymptotic z.
+
+Formula:
+  log_price ~ C(room_type, Treatment(reference="Entire home/apt")) + minimum_nights + availability_365 + calculated_host_listings_count + number_of_reviews + C(neighbourhood_group, Treatment(reference="City of Los Angeles"))
+
+Categorical reference levels (coefficients are relative to these):
+  room_type            = Entire home/apt
+  neighbourhood_group  = City of Los Angeles
+
+==============================================================================
+                            OLS Regression Results                            
+==============================================================================
+Dep. Variable:              log_price   R-squared:                       0.330
+Model:                            OLS   Adj. R-squared:                  0.329
+Method:                 Least Squares   F-statistic:                     1907.
+Date:                Tue, 01 Sep 2026   Prob (F-statistic):               0.00
+Time:                        03:05:35   Log-Likelihood:                -35467.
+No. Observations:               33067   AIC:                         7.095e+04
+Df Residuals:                   33057   BIC:                         7.104e+04
+Df Model:                           9                                         
+Covariance Type:                  HC3                                         
+==============================================================================================================================================================
+                                                                                                 coef    std err          z      P>|z|      [0.025      0.975]
+--------------------------------------------------------------------------------------------------------------------------------------------------------------
+Intercept                                                                                      5.1308      0.009    595.200      0.000       5.114       5.148
+C(room_type, Treatment(reference="Entire home/apt"))[T.Hotel room]                            -0.4312      0.054     -8.052      0.000      -0.536      -0.326
+C(room_type, Treatment(reference="Entire home/apt"))[T.Private room]                          -0.9184      0.008   -115.275      0.000      -0.934      -0.903
+C(room_type, Treatment(reference="Entire home/apt"))[T.Shared room]                           -1.6216      0.020    -79.483      0.000      -1.662      -1.582
+C(neighbourhood_group, Treatment(reference="City of Los Angeles"))[T.Other Cities]             0.0181      0.009      2.101      0.036       0.001       0.035
+C(neighbourhood_group, Treatment(reference="City of Los Angeles"))[T.Unincorporated Areas]    -0.0920      0.015     -6.190      0.000      -0.121      -0.063
+minimum_nights                                                                                -0.0015      0.000     -6.291      0.000      -0.002      -0.001
+availability_365                                                                               0.0007   2.87e-05     24.146      0.000       0.001       0.001
+calculated_host_listings_count                                                                -0.0015      0.000    -11.176      0.000      -0.002      -0.001
+number_of_reviews                                                                             -0.0015   5.14e-05    -29.561      0.000      -0.002      -0.001
+==============================================================================
+Omnibus:                     6950.812   Durbin-Watson:                   1.837
+Prob(Omnibus):                  0.000   Jarque-Bera (JB):            15059.388
+Skew:                           1.221   Prob(JB):                         0.00
+Kurtosis:                       5.228   Cond. No.                     3.36e+03
+==============================================================================
+
+Notes:
+[1] Standard Errors are heteroscedasticity robust (HC3)
+[2] The condition number is large, 3.36e+03. This might indicate that there are
+strong multicollinearity or other numerical problems.
