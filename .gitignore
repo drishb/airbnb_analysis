@@ -1,0 +1,10 @@
+# data is user-supplied, not committed
+data/*.csv
+
+# generated artefacts
+outputs/figures/*.png
+
+__pycache__/
+*.pyc
+.pytest_cache/
+.venv/

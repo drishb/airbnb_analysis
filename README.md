@@ -1,6 +1,6 @@
 # LA County Airbnb Market Structure Analysis
 
-Pipeline for the PRD in `../tasks/airbnb-prd.md`. Task list in `../tasks/airbnb-task.md`.
+Pipeline for the PRD in `tasks/airbnb-prd.md`. Task list in `tasks/airbnb-task.md`.
 Every design choice and its reasoning is in `DECISIONS.md`.
 
 **Status:** tasks 1.0–3.0 complete. 29 tests passing. Tasks 4.0–8.0 not built.
