@@ -89,29 +89,100 @@ COASTLINE = [
 # Catalina is deliberately absent. See ISLAND_NEIGHBOURHOODS above.
 
 # --- Indicator families (PRD req 50, family weighting) -------------------
-# Populated in task 4.0 once all indicator columns exist. Declared here so
-# the weighting scheme has a single source of truth.
+# The eight families named in PRD Goal 2. The union of these lists is exactly
+# the feature set task 6.0 standardises and weights (31 features). This is an
+# explicit map, not derived from column prefixes at runtime, because three
+# column groups break a pure prefix rule (task 4.3 decision, agreed with the
+# researcher):
+#
+#   1. `rev_` and `occ_` are one family here. PRD Goal 2 lists
+#      "revenue/occupancy" as a single family, so the four columns share one
+#      1/sqrt(size) divisor rather than counting as two families.
+#   2. `rev_divergence_ratio` is not a feature. It is rev_uncapped_median /
+#      rev_capped_median - both already features - so including it
+#      triple-counts revenue. It is a trust flag on the estimate, not a
+#      market-structure dimension. -> DESCRIPTIVE_ONLY_COLUMNS.
+#   3. `price_median_<room_type>` columns are not features. PRD req 26's four
+#      statistics are the structural price indicators; the per-room-type
+#      medians in req 27 are descriptive detail. -> DESCRIPTIVE_ONLY_COLUMNS.
 
-INDICATOR_FAMILIES: dict[str, list[str]] = {}
+INDICATOR_FAMILIES: dict[str, list[str]] = {
+    "tourism": [
+        "tour_reviews_per_month_mean",
+        "tour_reviews_per_month_median",
+        "tour_reviews_total_mean",
+        "tour_entire_home_share",
+        "tour_dist_hollywood_km_median",
+        "tour_dist_downtown_km_median",
+        "tour_dist_universal_km_median",
+        "tour_dist_disneyland_km_median",
+        "tour_dist_coast_km_median",
+    ],
+    "host_concentration": [
+        "host_hhi",
+        "host_share_10plus",
+        "host_top5_share",
+        "host_multilisting_share",
+    ],
+    "regulatory": [
+        "reg_min30_share",
+        "reg_min_nights_median",
+    ],
+    "tenure": [
+        "tenure_months_median",
+    ],
+    "revenue_occupancy": [
+        "rev_uncapped_median",
+        "rev_capped_median",
+        "occ_booked_days_median",
+        "occ_zero_availability_share",
+    ],
+    "price": [
+        "price_median",
+        "price_iqr",
+        "price_cv",
+        "price_gini",
+    ],
+    "inactivity": [
+        "inactivity_never_reviewed_share",
+        "inactivity_stale_since_covid_share",
+    ],
+    "text": [
+        "topic_0_loading",
+        "topic_1_loading",
+        "topic_2_loading",
+        "topic_3_loading",
+        "topic_4_loading",
+    ],
+}
 
 
-# --- Descriptive-only columns (task 2.0 decision) ------------------------
-# Real where present, but too sparse to carry a distance metric. Hotel-room
-# medians exist for only 18 of the 79 retained neighbourhoods and shared-room
-# for 67. K-means cannot accept NaN, and imputing a hotel price for a
-# neighbourhood with no hotels would fabricate data. These are reported and
-# excluded from clustering features (task 6.0).
+# --- Descriptive-only columns ------------------------------------------
+# In the exported table and used for description, never clustering features.
+# Reasons vary:
+#   - hotel/shared room medians: too sparse (task 2.0) - hotel-room medians
+#     exist for only 18 of the 79 retained neighbourhoods; imputing a hotel
+#     price where there are no hotels would fabricate data.
+#   - entire-home/private-room medians, rev_divergence_ratio: redundant with
+#     existing features (task 4.3, see INDICATOR_FAMILIES above).
+#   - listing_count, *_supporting_listings: counts that re-encode
+#     neighbourhood size (handoff decision 8).
+#   - the rest: identifiers, flags, coordinates.
 
 DESCRIPTIVE_ONLY_COLUMNS = [
-    "price_median_hotel_room",
-    "price_median_shared_room",
+    "listing_count",
+    "low_confidence",
     "neighbourhood_group",
-    "occ_proxy_unreliable",
-    "rev_supporting_listings",
-    "tenure_supporting_listings",
     "centroid_lat",
     "centroid_lon",
-    "listing_count",
+    "price_median_entire_home_apt",
+    "price_median_hotel_room",
+    "price_median_private_room",
+    "price_median_shared_room",
+    "rev_divergence_ratio",
+    "rev_supporting_listings",
+    "tenure_supporting_listings",
+    "occ_proxy_unreliable",
 ]
 
 

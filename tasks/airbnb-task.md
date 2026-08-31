@@ -80,8 +80,8 @@ Source PRD: `airbnb-prd.md`
 
     - [x] 4.1 Assemble all indicators into a single neighbourhood table, one row per neighbourhood (req 37).
     - [x] 4.2 Add a listing-count column and a low-confidence flag at n < 100 (req 38).
-    - [ ] 4.3 Populate `INDICATOR_FAMILIES` in `config.py` now that every indicator column name is known — needed by task 6.0's weighting.
-    - [ ] 4.4 Implement exclusion: filter low-confidence neighbourhoods from ranked output, clustering, and maps, while retaining all 264 in the exported table (req 39).
+    - [x] 4.3 Populate `INDICATOR_FAMILIES` in `config.py` now that every indicator column name is known — needed by task 6.0's weighting.
+    - [x] 4.4 Implement exclusion: filter low-confidence neighbourhoods from ranked output, clustering, and maps, while retaining all 264 in the exported table (req 39).
     - [ ] 4.5 Write `excluded_neighbourhoods.md` with the excluded list, listing counts, total listings removed, and the three stated reasons — rate instability, mechanical HHI inflation, clustering distortion (req 40).
     - [ ] 4.6 Run the full ranking and clustering at n = 50, 100, and 200 and report how many neighbourhoods change cluster assignment between thresholds (req 41).
     - [ ] 4.7 Export the neighbourhood table to `outputs/neighbourhood_indicators.csv` (req 42).
