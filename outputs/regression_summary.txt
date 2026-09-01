@@ -7,6 +7,12 @@ winsorised at the 1st/99th percentile per req 4.
 Standard errors: heteroskedasticity-robust (HC3), so the reported
 per-coefficient statistic is the asymptotic z.
 
+Success metric 3 (R^2 >= 0.35): NOT MET. R^2 = 0.330 on the req-43
+feature set. The 264-dummy fixed-effects variant clears the bar
+(R^2 = 0.481) but is inadmissible under HC3 - see NEIGHBOURHOOD
+FIXED EFFECTS below. The req-43 formula is fixed, so the miss is
+accepted and recorded (task 5.6 decision).
+
 Formula:
   log_price ~ C(room_type, Treatment(reference="Entire home/apt")) + minimum_nights + availability_365 + calculated_host_listings_count + number_of_reviews + C(neighbourhood_group, Treatment(reference="City of Los Angeles"))
 
@@ -21,7 +27,7 @@ Dep. Variable:              log_price   R-squared:                       0.330
 Model:                            OLS   Adj. R-squared:                  0.329
 Method:                 Least Squares   F-statistic:                     1907.
 Date:                Tue, 01 Sep 2026   Prob (F-statistic):               0.00
-Time:                        20:01:07   Log-Likelihood:                -35467.
+Time:                        20:54:01   Log-Likelihood:                -35467.
 No. Observations:               33067   AIC:                         7.095e+04
 Df Residuals:                   33057   BIC:                         7.104e+04
 Df Model:                           9                                         
@@ -78,3 +84,45 @@ minimum_nights                                                                  
 availability_365                                                                                 per +1 unit    0.0007     0.07     0.07       0.06       0.08
 calculated_host_listings_count                                                                   per +1 unit   -0.0015    -0.15    -0.15      -0.18      -0.13
 number_of_reviews                                                                                per +1 unit   -0.0015    -0.15    -0.15      -0.16      -0.14
+
+
+==============================================================================
+NEIGHBOURHOOD FIXED EFFECTS  (task 5.6 / PRD open question 2)
+==============================================================================
+
+Same listing-level model, two neighbourhood controls:
+  base : + C(neighbourhood_group)   (3 levels,  HC3)
+  FE   : + C(neighbourhood)          (264 levels, 263 dummies)
+
+                         base            FE
+  n                     33067         33067
+  parameters               10           271
+  R^2                   0.330         0.481
+  adjusted R^2          0.329         0.477
+  AIC                   70953         62995
+  BIC                   71037         65273
+
+  adjusted R^2 change with FE: +0.148
+  R^2 >= 0.35 (success metric 3): base misses, FE meets
+
+FE feasibility under HC3 (requirement 44):
+  neighbourhoods with 1 listing : 7  (Cudahy, Hawaiian Gardens, Lake Hughes, Northwest Antelope Valley, Ridge Route, South Diamond Bar, Whittier Narrows)
+  neighbourhoods with < 10      : 55
+  all HC3 standard errors finite: False
+  A single-listing neighbourhood's dummy fits that row exactly,
+  so leverage = 1 and HC3's 1/(1-h)^2 weight is undefined. Every
+  HC3 SE in the FE fit is therefore infinite.
+
+DECISION
+------------------------------------------------------------------------------
+The req-43 model (neighbourhood_group, HC3) stays the PRIMARY reported model.
+The 264-dummy fixed-effects variant fits better (R^2 0.330 -> 0.481, adjusted
+0.329 -> 0.477), which says neighbourhood location carries real price signal
+beyond the three groups. But it cannot be the reported model: 7 neighbourhoods
+have a single listing, giving those rows leverage 1 once their dummy enters
+the design, which makes every HC3 standard error in the fit infinite.
+Requirement 44 mandates HC3, so the FE spec is inadmissible here. This is PRD
+open question 2's over-parameterisation concern, concrete: the small
+neighbourhoods that the n>=100 rule already excludes from aggregation also
+break the listing-level model. The FE result is retained below as a robustness
+note only.

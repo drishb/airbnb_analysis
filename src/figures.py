@@ -113,3 +113,37 @@ def residual_diagnostics(results, name: str = "residual_diagnostics.png"):
     fig.suptitle("Hedonic log-price regression - residual diagnostics",
                  fontsize=12)
     return save(fig, name)
+
+
+def plot_k_selection(diag, selected_k: int, name: str = "elbow_silhouette.png"):
+    """
+    PRD req 51: the elbow (inertia) and silhouette curves over k, on one
+    figure with a twin y-axis, the selected k marked.
+
+    `diag` is `clustering.k_diagnostics` output - a frame indexed by k with
+    `inertia` and `silhouette` columns.
+    """
+    k = diag.index.to_numpy()
+
+    fig, ax_inertia = plt.subplots(figsize=(8, 5))
+    ax_sil = ax_inertia.twinx()
+
+    line_i, = ax_inertia.plot(k, diag["inertia"], "o-", color="#3b528b",
+                              label="inertia (elbow)")
+    line_s, = ax_sil.plot(k, diag["silhouette"], "s--", color="#5ec962",
+                          label="mean silhouette")
+
+    ax_inertia.axvline(selected_k, color="0.4", lw=1, ls=":")
+    ax_inertia.set_xlabel("k (number of clusters)")
+    ax_inertia.set_ylabel("K-means inertia")
+    ax_sil.set_ylabel("mean silhouette score")
+    ax_inertia.set_xticks(k)
+    ax_inertia.set_title(f"Cluster count selection - k = {selected_k} chosen")
+
+    ax_inertia.legend(handles=[line_i, line_s], loc="upper right")
+    ax_inertia.annotate(
+        f"selected k = {selected_k}",
+        xy=(selected_k, diag.loc[selected_k, "inertia"]),
+        xytext=(8, 12), textcoords="offset points", fontsize=8, color="0.3",
+    )
+    return save(fig, name)

@@ -231,7 +231,29 @@ def write_exclusion_report(
             "",
         ]
     else:
-        lines += [sensitivity.to_markdown(index=False), ""]
+        worst = sensitivity["pct_changed"].max()
+        lines += [
+            f"The ranking and family-weighted K-means (k = {config.CLUSTER_K}, "
+            "held fixed) were re-run at each threshold. For every pair, cluster "
+            "ids were matched by maximum overlap on the neighbourhoods common "
+            "to both fits; the table counts how many of those common "
+            "neighbourhoods still land in a different cluster.",
+            "",
+            sensitivity.to_markdown(index=False),
+            "",
+            f"Between **{worst:.0f}%** (widest pair) and "
+            f"{sensitivity['pct_changed'].min():.0f}% of common neighbourhoods "
+            "change cluster as the threshold moves. The threshold choice is "
+            "therefore **load-bearing** for the fine cluster partition - it "
+            "shifts which small-to-mid neighbourhoods anchor which centroid. "
+            "This matches the modest silhouette (~0.19) and the "
+            "family-weighted vs. PCA adjusted Rand index (~0.30) reported in "
+            "`cluster_summary.md`: the broad segmentation is stable, the "
+            "exact membership of the middle clusters is not. The n >= 100 "
+            "rule is retained for the reasons above; readers should treat "
+            "individual cluster membership near the boundary as approximate.",
+            "",
+        ]
 
     lines += [
         f"## Full list of excluded neighbourhoods ({len(excluded)})",

@@ -28,7 +28,15 @@ K-means minimises within-cluster variance. A small neighbourhood with an extreme
 
 ## Threshold sensitivity (req 41)
 
-_Pending: the n = 50 / 100 / 200 cluster-stability comparison is produced by task 4.6 once the clustering stage (task 6.0) exists. It will report how many neighbourhoods change cluster assignment between thresholds; if that number is small, the choice of 100 is not load-bearing._
+The ranking and family-weighted K-means (k = 5, held fixed) were re-run at each threshold. For every pair, cluster ids were matched by maximum overlap on the neighbourhoods common to both fits; the table counts how many of those common neighbourhoods still land in a different cluster.
+
+|   threshold_low |   threshold_high |   n_common |   n_changed |   pct_changed |
+|----------------:|-----------------:|-----------:|------------:|--------------:|
+|              50 |              100 |         79 |          18 |          22.8 |
+|             100 |              200 |         45 |          18 |          40   |
+|              50 |              200 |         45 |          19 |          42.2 |
+
+Between **42%** (widest pair) and 23% of common neighbourhoods change cluster as the threshold moves. The threshold choice is therefore **load-bearing** for the fine cluster partition - it shifts which small-to-mid neighbourhoods anchor which centroid. This matches the modest silhouette (~0.19) and the family-weighted vs. PCA adjusted Rand index (~0.30) reported in `cluster_summary.md`: the broad segmentation is stable, the exact membership of the middle clusters is not. The n >= 100 rule is retained for the reasons above; readers should treat individual cluster membership near the boundary as approximate.
 
 ## Full list of excluded neighbourhoods (185)
 

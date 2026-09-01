@@ -236,3 +236,59 @@ SUPPRESS_ROOM_TYPE = {
 TFIDF_MIN_DF = 20
 TFIDF_MIN_DF_SENSITIVITY = [10, 20, 50]
 NMF_K_RANGE = [5, 6, 7, 8]
+
+# --- Clustering (PRD req 51-53) ----------------------------------------
+# k is swept over CLUSTER_K_RANGE for the elbow / silhouette diagnostics
+# (req 51). CLUSTER_K is the selected value: silhouette is flat and low
+# across all k on this data (~0.19 peak, below success metric 4's 0.25 -
+# 79 neighbourhoods on 31 correlated indicators do not form tight groups),
+# and the inertia curve has no sharp elbow, so the choice leans on
+# interpretability. k=5 sits at a local silhouette peak, gives five
+# nameable market types without fragmenting into size-2 clusters, and
+# matches the independently-chosen NMF topic count. Decision recorded in
+# cluster_summary.md (task 6.8), agreed with the researcher.
+CLUSTER_K_RANGE = list(range(2, 11))
+CLUSTER_K = 5
+PCA_VARIANCE_RETAINED = 0.85      # PRD req 53, robustness check
+KMEANS_N_INIT = 10
+
+# --- Cluster labels (PRD req 55) --------------------------------------
+# Assigned POST-HOC, after fitting K-means at k=5, by reading the centroid
+# table (task 6.6) in original units. Keyed by the cluster id the fixed
+# seed produces. `clustering.label_clusters` guards these against the fit
+# drifting: if the identifying feature of a cluster (below) no longer
+# matches its id, it raises rather than mislabel silently.
+#
+#   0  Long-stay / regulation-exempt core
+#      median minimum_nights = 27, 55% of listings at 30+ nights (both the
+#      highest of any cluster), lowest tourist activity (median
+#      reviews/month 0.6), 9-13 km from Hollywood/Downtown, host top-5
+#      share 0.25. Housing let for 30+ nights to sit outside LA's
+#      Home-Sharing Ordinance. Members incl. Koreatown, Hollywood,
+#      Westwood, Mid-Wilshire.
+#   1  Outer suburban budget, owner-hosted
+#      lowest median price ($83), farthest out (28 km from Hollywood),
+#      median minimum_nights = 2, only 12% at 30+ nights, lowest revenue,
+#      lowest host concentration. Members incl. Pasadena, Long Beach,
+#      Glendale, Torrance.
+#   2  Island resort, single operator
+#      Avalon (Santa Catalina) alone: host HHI 0.42, top-5 share 0.79,
+#      97% entire-home, 59% never reviewed, median price $450, 84 km from
+#      Hollywood. A one-neighbourhood cluster - see task 6.3 note.
+#   3  Upmarket hillside & Westside
+#      highest median price ($256) and highest price inequality
+#      (Gini 0.59, IQR $454), 73% entire-home, lowest host concentration.
+#      Members incl. Beverly Hills, Malibu, Bel-Air (Beverly Crest),
+#      Pacific Palisades, Hollywood Hills.
+#   4  Established high-turnover tourist
+#      most reviews per listing (42), highest estimated revenue
+#      ($8.5k uncapped), longest tenure (35 months), highest booked-days
+#      proxy (248/365). Members incl. Venice, Silver Lake, West Hollywood,
+#      Echo Park, Studio City.
+CLUSTER_LABELS = {
+    0: "Long-stay / regulation-exempt core",
+    1: "Outer suburban budget, owner-hosted",
+    2: "Island resort, single operator",
+    3: "Upmarket hillside & Westside",
+    4: "Established high-turnover tourist",
+}
