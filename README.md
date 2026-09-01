@@ -1,7 +1,8 @@
 # LA County Airbnb Market Structure Analysis
 
 Pipeline for the PRD in `tasks/airbnb-prd.md`. Task list in `tasks/airbnb-task.md`.
-Every design choice and its reasoning is in `DECISIONS.md`.
+Every design choice and its reasoning is in `DECISIONS.md`. The substantive
+results are written up in `FINDINGS.md`.
 
 It ingests one Inside Airbnb snapshot (`listings_California.csv`, ~33k LA
 County listings, scraped ~August 2020) and produces neighbourhood-level
