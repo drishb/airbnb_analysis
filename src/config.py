@@ -17,6 +17,22 @@ FIGURE_DIR = OUTPUT_DIR / "figures"
 
 RANDOM_SEED = 42
 
+# --- Figures (PRD req 60, 61, PRD §6) -----------------------------------
+# Every figure: >=150 dpi PNG, a perceptually uniform sequential colourmap
+# (viridis) for continuous indicators, and a caption stating the snapshot
+# date and the pandemic caveat. The caption text is fixed here so it reads
+# identically on all ten figures.
+
+FIGURE_DPI = 150
+FIGURE_CMAP = "viridis"          # continuous indicators
+FIGURE_CMAP_CATEGORICAL = "tab10"  # cluster assignment
+FIGURE_CAPTION = (
+    "Inside Airbnb snapshot of LA County, scraped ~August 2020. "
+    "Single cross-section: shows market structure at one point in time, not change. "
+    "Scraped mid-pandemic — 44.7% of reviewed listings had no review since March 2020, "
+    "so activity and inactivity measures reflect COVID conditions, not baseline demand."
+)
+
 # --- Schema (PRD req 1) --------------------------------------------------
 
 EXPECTED_COLUMNS = [

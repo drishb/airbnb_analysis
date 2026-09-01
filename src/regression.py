@@ -10,6 +10,7 @@ This file grows through task 5.0: 5.1 builds the model frame (here),
 diagnostics, 5.6 resolves the neighbourhood-fixed-effects question.
 """
 
+import numpy as np
 import pandas as pd
 import statsmodels.formula.api as smf
 
@@ -97,6 +98,117 @@ def fit_model(frame: pd.DataFrame):
     return results
 
 
+CONTINUOUS_PREDICTORS = {
+    "minimum_nights",
+    "availability_365",
+    "calculated_host_listings_count",
+    "number_of_reviews",
+}
+
+
+def percentage_effects(results) -> pd.DataFrame:
+    """
+    PRD req 47: the log-price coefficients re-expressed as percentage
+    effects on price itself. A reader wants "how much does this move the
+    nightly rate", not a shift in log units.
+
+    Both conventional forms are reported (req 5.4 asks for both):
+      - approx_pct_effect = 100 * beta
+        the small-coefficient rule of thumb.
+      - exact_pct_effect  = 100 * (exp(beta) - 1)
+        the correct multiplicative effect for any beta.
+
+    They agree to a fraction of a point for |beta| < ~0.1 and diverge
+    sharply above it: the room-type dummies run to beta = -1.62, where the
+    approximation is off by 30+ points. `exact_pct_effect` is the column
+    to read there. The confidence bounds (HC3) are carried through the
+    exact transform.
+
+    `kind` says how to read each row: "per +1 unit" for the continuous
+    predictors, "vs. reference" for the treatment-coded dummies. The
+    intercept is a price level, not an effect, so its percentage columns
+    are left blank.
+    """
+    params = results.params
+    conf = results.conf_int()
+    conf.columns = ["ci_low", "ci_high"]
+
+    def _kind(name: str) -> str:
+        if name == "Intercept":
+            return "(baseline level)"
+        if name in CONTINUOUS_PREDICTORS:
+            return "per +1 unit"
+        return "vs. reference"
+
+    out = pd.DataFrame(
+        {
+            "kind": [_kind(n) for n in params.index],
+            "coef_log": params,
+            "approx_pct_effect": 100.0 * params,
+            "exact_pct_effect": 100.0 * (np.exp(params) - 1.0),
+            "exact_pct_ci_low": 100.0 * (np.exp(conf["ci_low"]) - 1.0),
+            "exact_pct_ci_high": 100.0 * (np.exp(conf["ci_high"]) - 1.0),
+        }
+    )
+
+    pct_cols = [
+        "approx_pct_effect",
+        "exact_pct_effect",
+        "exact_pct_ci_low",
+        "exact_pct_ci_high",
+    ]
+    if "Intercept" in out.index:
+        out.loc["Intercept", pct_cols] = np.nan
+
+    return out
+
+
+def _format_percentage_effects(pe: pd.DataFrame) -> str:
+    """Render `percentage_effects` as a fixed-width block for the summary."""
+    disp = pe.rename(
+        columns={
+            "coef_log": "coef(log)",
+            "approx_pct_effect": "approx %",
+            "exact_pct_effect": "exact %",
+            "exact_pct_ci_low": "exact % lo",
+            "exact_pct_ci_high": "exact % hi",
+        }
+    )
+    pct = lambda v: f"{v:8.2f}"
+    body = disp.to_string(
+        formatters={
+            "coef(log)": lambda v: f"{v:9.4f}",
+            "approx %": pct,
+            "exact %": pct,
+            "exact % lo": pct,
+            "exact % hi": pct,
+        },
+        na_rep="  -  ",
+    )
+    lines = [
+        "",
+        "",
+        "=" * 78,
+        "PERCENTAGE PRICE EFFECTS (PRD req 47)",
+        "=" * 78,
+        "",
+        "The coefficients above are shifts in log(price). Re-expressed as",
+        "effects on price:",
+        "    approx % = 100 * beta          exact % = 100 * (exp(beta) - 1)",
+        "",
+        "The two agree while |beta| is small. Past |beta| ~ 0.2 the",
+        "approximation overstates the effect: read the exact column for the",
+        "room-type dummies (e.g. Private room is -60%, not -92%). CI bounds",
+        "are the HC3 interval carried through the exact transform.",
+        "'per +1 unit' rows are the effect of one more night / day / listing /",
+        "review; 'vs. reference' rows are relative to the categorical baseline.",
+        "",
+        body,
+        "",
+    ]
+    return "\n".join(lines)
+
+
 def write_summary(results, path=None) -> str:
     """
     PRD req 45: the full coefficient table — coefficient, standard error,
@@ -106,7 +218,8 @@ def write_summary(results, path=None) -> str:
     The body is `statsmodels`' own summary. Because the fit uses a robust
     covariance, the per-coefficient statistic is the asymptotic **z**, not
     a t — statsmodels labels it accordingly. Task 5.4 appends the
-    percentage-effect reading of the log coefficients to this same file.
+    percentage-effect reading of the log coefficients (`percentage_effects`)
+    to this same file.
     """
     path = path or (config.OUTPUT_DIR / "regression_summary.txt")
 
@@ -131,7 +244,12 @@ def write_summary(results, path=None) -> str:
         "",
     ]
 
-    text = "\n".join(header) + str(results.summary()) + "\n"
+    text = (
+        "\n".join(header)
+        + str(results.summary())
+        + "\n"
+        + _format_percentage_effects(percentage_effects(results))
+    )
     path.write_text(text, encoding="utf-8")
     print(f"[regression] summary -> {path} "
           f"(R^2={results.rsquared:.3f}, n={int(results.nobs)})")

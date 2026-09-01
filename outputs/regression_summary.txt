@@ -21,7 +21,7 @@ Dep. Variable:              log_price   R-squared:                       0.330
 Model:                            OLS   Adj. R-squared:                  0.329
 Method:                 Least Squares   F-statistic:                     1907.
 Date:                Tue, 01 Sep 2026   Prob (F-statistic):               0.00
-Time:                        03:05:35   Log-Likelihood:                -35467.
+Time:                        20:01:07   Log-Likelihood:                -35467.
 No. Observations:               33067   AIC:                         7.095e+04
 Df Residuals:                   33057   BIC:                         7.104e+04
 Df Model:                           9                                         
@@ -50,3 +50,31 @@ Notes:
 [1] Standard Errors are heteroscedasticity robust (HC3)
 [2] The condition number is large, 3.36e+03. This might indicate that there are
 strong multicollinearity or other numerical problems.
+
+
+==============================================================================
+PERCENTAGE PRICE EFFECTS (PRD req 47)
+==============================================================================
+
+The coefficients above are shifts in log(price). Re-expressed as
+effects on price:
+    approx % = 100 * beta          exact % = 100 * (exp(beta) - 1)
+
+The two agree while |beta| is small. Past |beta| ~ 0.2 the
+approximation overstates the effect: read the exact column for the
+room-type dummies (e.g. Private room is -60%, not -92%). CI bounds
+are the HC3 interval carried through the exact transform.
+'per +1 unit' rows are the effect of one more night / day / listing /
+review; 'vs. reference' rows are relative to the categorical baseline.
+
+                                                                                                        kind coef(log) approx %  exact % exact % lo exact % hi
+Intercept                                                                                   (baseline level)    5.1308      -        -          -          -  
+C(room_type, Treatment(reference="Entire home/apt"))[T.Hotel room]                             vs. reference   -0.4312   -43.12   -35.03     -41.50     -27.84
+C(room_type, Treatment(reference="Entire home/apt"))[T.Private room]                           vs. reference   -0.9184   -91.84   -60.09     -60.70     -59.46
+C(room_type, Treatment(reference="Entire home/apt"))[T.Shared room]                            vs. reference   -1.6216  -162.16   -80.24     -81.02     -79.44
+C(neighbourhood_group, Treatment(reference="City of Los Angeles"))[T.Other Cities]             vs. reference    0.0181     1.81     1.83       0.12       3.56
+C(neighbourhood_group, Treatment(reference="City of Los Angeles"))[T.Unincorporated Areas]     vs. reference   -0.0920    -9.20    -8.79     -11.41      -6.09
+minimum_nights                                                                                   per +1 unit   -0.0015    -0.15    -0.15      -0.20      -0.10
+availability_365                                                                                 per +1 unit    0.0007     0.07     0.07       0.06       0.08
+calculated_host_listings_count                                                                   per +1 unit   -0.0015    -0.15    -0.15      -0.18      -0.13
+number_of_reviews                                                                                per +1 unit   -0.0015    -0.15    -0.15      -0.16      -0.14

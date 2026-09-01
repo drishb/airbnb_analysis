@@ -92,8 +92,8 @@ Source PRD: `airbnb-prd.md`
     - [x] 5.1 Build the model frame: `log_price` against room type, minimum nights, availability, host listing count, review count, and neighbourhood group, on all listings rather than only retained neighbourhoods (req 43, 48). `src/regression.py`: `FORMULA` (categoricals with explicit reference levels — Entire home/apt, City of Los Angeles) + `build_model_frame` (33,067 listings, 7 cols, null-checked). Response is `log_price` = log(price_winsorized).
     - [x] 5.2 Fit OLS with HC3 robust standard errors (req 44). `fit_model(frame)` -> HC3 at fit time. n=33,067, R^2=0.330, adj R^2=0.329; all 9 coefficients significant at p<0.05. **R^2 below success-metric-3's 0.35 bar** — the neighbourhood-fixed-effects variant (5.6) is expected to clear it.
     - [x] 5.3 Write the coefficient table with standard errors, t-statistics, p-values, R-squared, and n to `outputs/regression_summary.txt` (req 45). `write_summary(results)`: annotated header (formula, reference levels, HC3 note) + `statsmodels` summary. Robust cov -> statistic is asymptotic z, labelled as such.
-    - [ ] 5.4 Convert log coefficients to approximate percentage price effects and include both forms in the output (req 47).
-    - [ ] 5.5 Produce residuals-vs-fitted and Q-Q diagnostic plots (req 46).
+    - [x] 5.4 Convert log coefficients to approximate percentage price effects and include both forms in the output (req 47). `percentage_effects(results)`: `coef_log`, `approx_pct_effect` (100·β), `exact_pct_effect` (100·(eᵝ−1)), and exact HC3 CI bounds. `write_summary` appends a "PERCENTAGE PRICE EFFECTS" section; exact form emphasised since the approximation overstates the room-type dummies (Private room −92% approx vs −60% exact).
+    - [x] 5.5 Produce residuals-vs-fitted and Q-Q diagnostic plots (req 46). Built `src/figures.py` first (task 7.1's shared helper, brought forward): `save()` attaches `config.FIGURE_CAPTION` + writes 150 dpi PNG via the Agg backend; viridis set as the default cmap. `residual_diagnostics(results)` → `outputs/figures/residual_diagnostics.png`. Q-Q shows the heavy tails already flagged by Omnibus/JB (skew 1.22, kurt 5.23); the diagonal streaks in residuals-vs-fitted are the 1/99 winsorisation caps on the response.
     - [ ] 5.6 Decide the open question on neighbourhood fixed effects: fit with and without 264 dummies, compare adjusted R-squared, and record the choice (PRD §9.2).
 
 - [ ] 6.0 Neighbourhood clustering
@@ -110,7 +110,7 @@ Source PRD: `airbnb-prd.md`
 
 - [ ] 7.0 Figure generation
 
-    - [ ] 7.1 Write a shared figure helper in `src/figures.py`: consistent viridis colourmap, 150 dpi, and a caption on every figure noting the August 2020 snapshot and the pandemic caveat (req 61, PRD §6).
+    - [x] 7.1 Write a shared figure helper in `src/figures.py`: consistent viridis colourmap, 150 dpi, and a caption on every figure noting the August 2020 snapshot and the pandemic caveat (req 61, PRD §6). Done early during task 5.5. `save(fig, name, caption=None)` — wraps `config.FIGURE_CAPTION`, writes `outputs/figures/<name>` PNG at `config.FIGURE_DPI` (150) with `bbox_inches="tight"`, closes the fig. Module forces the Agg backend and sets viridis (`FIGURE_CMAP`) as the rc default; `FIGURE_CMAP_CATEGORICAL` = tab10 for clusters.
     - [ ] 7.2 Build the centroid bubble map function — one marker per retained neighbourhood at its mean lat/long, sized by listing count, coloured by indicator (req 57).
     - [ ] 7.3 Render bubble maps for median price, host HHI, tourism intensity, 30-night-minimum share, and cluster assignment (req 57).
     - [ ] 7.4 Render the hexbin density map over raw lat/long, independent of neighbourhood labels (req 58).
