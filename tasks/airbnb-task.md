@@ -22,7 +22,9 @@ Source PRD: `airbnb-prd.md`
 - `src/clustering.py` - Family-weighted K-means, k selection, PCA robustness check, centroid labelling (PRD req 49-56).
 - `tests/test_clustering.py` - Unit tests for the family weighting transform.
 - `src/figures.py` - All matplotlib output: bubble maps, hexbin, histograms, diagnostics (PRD req 16, 22, 46, 57-60).
-- `src/report.py` - Writes `limitations.md` and assembles markdown outputs (PRD req 67).
+- `tests/test_figures.py` - Smoke tests: each figure function writes a non-empty 150-dpi PNG.
+- `src/report.py` - Writes `limitations.md` and `success_metrics.md` (PRD req 67, task 8.8).
+- `tests/test_report.py` - §10 field coverage in `limitations.md`; success-metric pass/fail logic.
 - `requirements.txt` - Pinned dependency versions (PRD req 68).
 - `README.md` - Setup instructions including one-time `nltk.download()` if NLTK is used (PRD req 63).
 

@@ -8,7 +8,7 @@ County listings, scraped ~August 2020) and produces neighbourhood-level
 indicator tables, a hedonic price regression, a family-weighted K-means
 segmentation, and ten static figures — all from a single command.
 
-**Status:** tasks 1.0–8.0 complete. `pytest` → 45 passing.
+**Status:** tasks 1.0–8.0 complete. `pytest` → 55 passing.
 
 ## Setup
 
@@ -29,7 +29,7 @@ network access is required** once the packages are installed.
 
 ```bash
 python run_analysis.py          # full pipeline, writes everything to outputs/
-pytest                          # 45 tests
+pytest                          # 55 tests
 pytest tests/test_geo.py        # one file
 ```
 

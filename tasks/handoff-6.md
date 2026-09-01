@@ -140,12 +140,16 @@ Q2 (fixed effects): no. PRD §9 and `DECISIONS.md` updated.
 Branch level with `origin/main`. `git add -A && git commit && git push`.
 Last commit: `433a408 add handoff-5: decisions through tasks 5.6, 6.0, 4.6`.
 
-## If more work is wanted
+## Follow-up done after the task list closed
 
-The task list is fully checked. Candidates for a follow-up pass, none
-required by the PRD:
-- A `tests/test_figures.py` (smoke test each figure function on a small
-  synthetic frame — currently only the full run exercises them).
-- A `tests/test_report.py` for the metric-check logic.
+- `tests/test_figures.py` (7 tests) — each figure function writes a
+  non-empty 150-dpi PNG into a tmp dir; continuous + categorical bubble
+  maps; partial-value maps don't raise.
+- `tests/test_report.py` (3 tests) — `limitations.md` covers every §10
+  field; `write_success_metrics` reports 11/11 when thresholds are met and
+  flags 3 + 4 as FAIL when they are not (fake pipeline objects).
+- `pytest` → **55 passed**.
+
+Still not done, none required by the PRD:
 - Revisit the two accepted metric misses only if the PRD's fixed
-  constraints (req 43 formula, family-weighting) are relaxed.
+  constraints (req 43 formula, family weighting) are relaxed.
