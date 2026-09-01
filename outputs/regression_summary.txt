@@ -26,8 +26,8 @@ Categorical reference levels (coefficients are relative to these):
 Dep. Variable:              log_price   R-squared:                       0.330
 Model:                            OLS   Adj. R-squared:                  0.329
 Method:                 Least Squares   F-statistic:                     1907.
-Date:                Tue, 01 Sep 2026   Prob (F-statistic):               0.00
-Time:                        20:54:01   Log-Likelihood:                -35467.
+Date:                (run date omitted)   Prob (F-statistic):               0.00
+Time:                        (omitted)   Log-Likelihood:                -35467.
 No. Observations:               33067   AIC:                         7.095e+04
 Df Residuals:                   33057   BIC:                         7.104e+04
 Df Model:                           9                                         

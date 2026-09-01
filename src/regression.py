@@ -10,6 +10,7 @@ This file grows through task 5.0: 5.1 builds the model frame (here),
 diagnostics, 5.6 resolves the neighbourhood-fixed-effects question.
 """
 
+import re
 import textwrap
 
 import numpy as np
@@ -17,6 +18,22 @@ import pandas as pd
 import statsmodels.formula.api as smf
 
 from . import config
+
+
+def _deterministic_summary(results) -> str:
+    """
+    `statsmodels`' summary text with the wall-clock `Date:` / `Time:` fields
+    blanked, so `regression_summary.txt` is byte-identical between runs
+    (success metric 10 in spirit - it only mandates the CSV, but there is no
+    reason for this file to churn). Field widths are preserved so the
+    column alignment of the summary block is untouched.
+    """
+    text = str(results.summary())
+    text = re.sub(r"(Date:\s+)\w{3}, \d{2} \w{3} \d{4}",
+                  lambda m: m.group(1) + "(run date omitted)", text)
+    text = re.sub(r"(Time:\s+)\d{2}:\d{2}:\d{2}",
+                  lambda m: m.group(1) + "(omitted)", text)
+    return text
 
 # PRD req 43: the model form is fixed. Categoricals carry an explicit
 # reference level so every coefficient reads as "versus this baseline"
@@ -284,7 +301,7 @@ def write_summary(results, path=None) -> str:
 
     text = (
         "\n".join(header)
-        + str(results.summary())
+        + _deterministic_summary(results)
         + "\n"
         + _format_percentage_effects(percentage_effects(results))
     )

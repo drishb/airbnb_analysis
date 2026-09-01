@@ -2,7 +2,7 @@
 
 Every non-obvious choice made while scoping and building this pipeline, and why. Ordered by when it came up.
 
-Status: tasks 1.0–3.0 complete, 29 tests passing. Tasks 4.0–8.0 not yet built.
+Status: tasks 1.0–8.0 complete, 45 tests passing. Pipeline runs end-to-end. Decisions for tasks 4.0–8.0 are logged in `tasks/handoff-4.md`, `handoff-5.md`, and `handoff-6.md` rather than expanded here.
 
 ---
 
@@ -182,10 +182,10 @@ Mean topic overlap against the reference fit is 0.68 at `min_df=10` and 0.73 at 
 
 ---
 
-## Open decisions, not yet made
+## Open decisions — now resolved
 
-1. Should the 0.5 reviews-per-stay constant be sensitivity-tested at 0.3 and 0.7, or taken as the Inside Airbnb convention?
-2. Should the hedonic regression include 264 neighbourhood dummies alongside `neighbourhood_group`? Some neighbourhoods hold under 10 listings, so those coefficients would be estimated off almost nothing. Current lean is no — `neighbourhood_group` plus the five distance features should absorb most spatial variation.
+1. **0.5 reviews-per-stay constant** — taken as the Inside Airbnb convention, no 0.3/0.7 sweep. Both revenue variants are exactly linear in it, so it rescales every estimate uniformly and reorders nothing. Stated in `limitations.md` §4. (task 8.8, PRD §9 Q1)
+2. **264 neighbourhood dummies** — no. Fitted both; the FE variant fits better (R² 0.48 vs 0.33) but 7 single-listing neighbourhoods give leverage 1, making every HC3 SE infinite (req 44). `neighbourhood_group` stays primary, FE kept as a robustness note. Success metric 3 miss accepted. (task 5.6, PRD §9 Q2)
 
 ---
 

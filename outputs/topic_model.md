@@ -23,7 +23,7 @@
 | 6 | los, angeles, los angeles, downtown, studio, apartment, feliz, downtown los, los feliz, la |
 | 7 | santa, monica, santa monica, apartment, monica beach, ocean, heart santa, location, ucla, view |
 
-**Why this run is not used.** Most topics here reproduce place names and room types — information already held in `neighbourhood`, `room_type`, and the five distance columns from task 2.0. Using these loadings as clustering features would weight geography a second time. The suppressed run above is used instead; this one is the evidence for that choice.
+**Why this run is not used.** Most topics here reproduce place names and room types â€” information already held in `neighbourhood`, `room_type`, and the five distance columns from task 2.0. Using these loadings as clustering features would weight geography a second time. The suppressed run above is used instead; this one is the evidence for that choice.
 
 ## Suppressed vocabulary (used)
 
@@ -51,11 +51,11 @@ The tourism / upmarket / commercial grouping was a prior, not an input. Overlap 
 
 |   topic |   tourism_hits | tourism_terms   |   upmarket_hits | upmarket_terms   |   commercial_hits | commercial_terms   |
 |--------:|---------------:|:----------------|----------------:|:-----------------|------------------:|:-------------------|
-|       0 |              0 | —               |               0 | —                |                 0 | —                  |
-|       1 |              0 | —               |               2 | luxury, modern   |                 0 | —                  |
-|       2 |              0 | —               |               0 | —                |                 0 | —                  |
-|       3 |              0 | —               |               0 | —                |                 0 | —                  |
-|       4 |              0 | —               |               1 | luxury           |                 0 | —                  |
+|       0 |              0 | â€”               |               0 | â€”                |                 0 | â€”                  |
+|       1 |              0 | â€”               |               2 | luxury, modern   |                 0 | â€”                  |
+|       2 |              0 | â€”               |               0 | â€”                |                 0 | â€”                  |
+|       3 |              0 | â€”               |               0 | â€”                |                 0 | â€”                  |
+|       4 |              0 | â€”               |               1 | luxury           |                 0 | â€”                  |
 
 Sensitivity to `min_df` (topic-set Jaccard vs. the min_df=20 fit):
 

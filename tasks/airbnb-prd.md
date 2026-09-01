@@ -1,4 +1,4 @@
-# PRD: LA County Airbnb Market Structure Analysis Pipeline
+l# PRD: LA County Airbnb Market Structure Analysis Pipeline
 
 ## 1. Introduction/Overview
 
@@ -254,10 +254,12 @@ Coast distance does not need a coastline shapefile. Eight hardcoded vertices app
 
 ## 9. Open Questions
 
-1. Should the 0.5 reviews-per-stay constant be sensitivity-tested (e.g. 0.3 and 0.7), or is the Inside Airbnb convention taken as given?
-2. Should the hedonic regression include neighbourhood fixed effects (264 dummies) in addition to `neighbourhood_group`, or does that over-parameterise given some neighbourhoods have very few listings?
+_Both resolved — see below._
 
 **Resolved:**
+
+- **Reviews-per-stay constant (Q1)** — taken as given (the Inside Airbnb 0.5 convention). No 0.3 / 0.7 sweep: both revenue variants are exactly linear in the constant, so it rescales every neighbourhood's estimate by the same factor and changes no ranking or cluster. `limitations.md` §4 states this and tells a reader who prefers another value to rescale the two revenue columns directly. (task 8.8)
+- **Neighbourhood fixed effects (Q2)** — **no.** Fitted both: `neighbourhood_group` (3 levels, HC3) gives R² 0.330 / adj 0.329; the 264-dummy variant gives R² 0.481 / adj 0.477 but is **inadmissible** — 7 single-listing neighbourhoods take leverage 1 once their dummy enters the design, so every HC3 standard error (req 44) is infinite. The req-43 model stays primary; FE is kept as a robustness note in `regression_summary.txt`. Consequence: success metric 3 is not met and the miss is accepted. (task 5.6)
 
 - External files — none permitted; CSV is the sole input (§4.14)
 - Choropleths — not buildable without boundary geometry; centroid bubbles + hexbin instead (§4.13, §7.2)

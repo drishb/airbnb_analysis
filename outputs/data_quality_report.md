@@ -9,18 +9,18 @@
 | Column | dtype | Nulls | Null % | Zeros | Min | Max |
 |---|---|---:|---:|---:|---:|---:|
 | `id` | int64 | 0 | 0.0% | 0 | 109 | 4.503e+07 |
-| `name` | str | 2 | 0.0% | — | — | — |
+| `name` | str | 2 | 0.0% | â€” | â€” | â€” |
 | `host_id` | int64 | 0 | 0.0% | 0 | 521 | 3.633e+08 |
-| `host_name` | str | 9 | 0.0% | — | — | — |
-| `neighbourhood_group` | str | 0 | 0.0% | — | — | — |
-| `neighbourhood` | str | 0 | 0.0% | — | — | — |
+| `host_name` | str | 9 | 0.0% | â€” | â€” | â€” |
+| `neighbourhood_group` | str | 0 | 0.0% | â€” | â€” | â€” |
+| `neighbourhood` | str | 0 | 0.0% | â€” | â€” | â€” |
 | `latitude` | float64 | 0 | 0.0% | 0 | 33.34 | 34.81 |
 | `longitude` | float64 | 0 | 0.0% | 0 | -118.9 | -117.7 |
-| `room_type` | str | 0 | 0.0% | — | — | — |
+| `room_type` | str | 0 | 0.0% | â€” | â€” | â€” |
 | `price` | int64 | 0 | 0.0% | 11 | 0 | 2.5e+04 |
 | `minimum_nights` | int64 | 0 | 0.0% | 0 | 1 | 1,125 |
 | `number_of_reviews` | int64 | 0 | 0.0% | 7118 | 0 | 821 |
-| `last_review` | datetime64[us] | 7,118 | 21.5% | — | 2010-03-28 | 2020-08-21 |
+| `last_review` | datetime64[us] | 7,118 | 21.5% | â€” | 2010-03-28 | 2020-08-21 |
 | `reviews_per_month` | float64 | 7,118 | 21.5% | 0 | 0.01 | 34.26 |
 | `calculated_host_listings_count` | int64 | 0 | 0.0% | 0 | 1 | 195 |
 | `availability_365` | int64 | 0 | 0.0% | 7743 | 0 | 365 |
@@ -41,7 +41,7 @@ These are retained deliberately. A listing with no reviews has never been booked
 
 ## Review-field consistency check
 
-Three fields encode the same underlying fact — that a listing has never been reviewed — and they agree exactly:
+Three fields encode the same underlying fact â€” that a listing has never been reviewed â€” and they agree exactly:
 
 | Condition | Listings |
 |---|---:|

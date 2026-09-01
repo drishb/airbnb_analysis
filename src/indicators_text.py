@@ -304,6 +304,6 @@ def write_report(df, path=None) -> pd.DataFrame:
             ]
 
     path = path or (config.OUTPUT_DIR / "topic_model.md")
-    path.write_text("\n".join(lines))
+    path.write_text("\n".join(lines), encoding="utf-8")
     print(f"[text] topic model -> {path}")
     return loadings

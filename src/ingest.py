@@ -218,7 +218,8 @@ def run(path=None) -> pd.DataFrame:
 
     config.OUTPUT_DIR.mkdir(parents=True, exist_ok=True)
     report_path = config.OUTPUT_DIR / "data_quality_report.md"
-    report_path.write_text(quality_report(df_raw, df_clean, stats))
+    report_path.write_text(quality_report(df_raw, df_clean, stats),
+                           encoding="utf-8")
 
     print(f"[ingest] {stats['rows_in']:,} rows in, {len(df_clean):,} after cleaning "
           f"({stats['zero_price_dropped']} zero-price dropped)")
