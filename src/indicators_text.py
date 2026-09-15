@@ -8,6 +8,7 @@ grouping is a hypothesis tested against the derived topics in
 """
 
 import re
+import unicodedata
 
 import numpy as np
 import pandas as pd
@@ -16,15 +17,11 @@ from sklearn.feature_extraction.text import TfidfVectorizer, ENGLISH_STOP_WORDS
 
 from . import config
 
-# Hypothesis under test (req 34). These terms are NOT used to build any
+# The tourism / upmarket / commercial hypothesis under test (req 34) lives
+# in `config.HYPOTHESIS` - it names LA landmarks (hollywood, disney,
+# universal), so it is per-dataset. These terms are NOT used to build any
 # indicator; they exist only so the derived topics can be checked against
 # the prior expectation and the comparison reported honestly.
-HYPOTHESIS = {
-    "tourism": ["beach", "hollywood", "steps", "disney", "universal", "walk"],
-    "upmarket": ["luxury", "modern", "renovated", "designer", "loft",
-                 "historic", "stylish"],
-    "commercial": ["unit", "apt", "suite", "studio apt", "no"],
-}
 
 
 def tokenize(text) -> str:
@@ -33,9 +30,18 @@ def tokenize(text) -> str:
     Null names (2 in the dataset) become empty strings rather than raising.
     Stopword removal is left to the vectoriser so the vocabulary and the
     stopword list stay in one place.
+
+    Accented Latin characters are folded to their base letter (NFKD
+    decompose, drop combining marks) before the alnum strip - without this,
+    "próximo" or "confortável" (Rio's Portuguese titles) split into
+    fragments ("pr", "ximo") at the punctuation-strip step instead of
+    surviving as one word. A no-op for the purely-ASCII English/Dutch
+    corpora.
     """
     if not isinstance(text, str):
         return ""
+    text = unicodedata.normalize("NFKD", text)
+    text = "".join(c for c in text if not unicodedata.combining(c))
     text = text.lower()
     text = re.sub(r"[^a-z0-9\s]", " ", text)
     return re.sub(r"\s+", " ", text).strip()
@@ -53,7 +59,7 @@ def _stopwords(suppress_place_and_type: bool, neighbourhoods=None) -> list:
     note in config.py for why: without this, NMF recovers `neighbourhood`
     and `room_type` from the titles and calls them topics.
     """
-    words = set(ENGLISH_STOP_WORDS)
+    words = set(ENGLISH_STOP_WORDS) | set(config.EXTRA_STOPWORDS)
     if not suppress_place_and_type:
         return list(words)
     words |= config.SUPPRESS_PLACE_EXTRA
@@ -196,7 +202,7 @@ def compare_to_hypothesis(terms_per_topic) -> pd.DataFrame:
     for t_idx, terms in enumerate(terms_per_topic):
         words = {w for w, _ in terms}
         row = {"topic": t_idx}
-        for label, expected in HYPOTHESIS.items():
+        for label, expected in config.HYPOTHESIS.items():
             hits = sorted(words & set(expected))
             row[f"{label}_hits"] = len(hits)
             row[f"{label}_terms"] = ", ".join(hits) if hits else "—"

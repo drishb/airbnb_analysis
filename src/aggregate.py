@@ -160,7 +160,10 @@ def write_exclusion_report(
     pct = 100 * removed / total_listings
 
     # Concrete figures for the reasons, taken from the actual excluded set.
-    smallest = int(excluded["listing_count"].min())
+    # A dataset can have nothing excluded (e.g. Amsterdam: all 22
+    # neighbourhoods clear n >= 100) - handled explicitly rather than
+    # crashing on an empty-series min().
+    smallest = int(excluded["listing_count"].min()) if len(excluded) else None
     near_miss = excluded[excluded["listing_count"] >= n - 10]
 
     lines = [
@@ -178,10 +181,20 @@ def write_exclusion_report(
         f"({100 * len(excluded) / len(tbl):.0f}%)",
         f"- Listings in excluded neighbourhoods: **{removed:,}** of "
         f"{total_listings:,} (**{pct:.1f}%**)",
-        f"- Excluded neighbourhoods hold **{smallest}** to "
-        f"**{int(excluded['listing_count'].max())}** listings each; "
-        f"{len(near_miss)} sit within 10 of the threshold "
-        f"({', '.join(f'{ix} ({int(r)})' for ix, r in near_miss['listing_count'].items())}).",
+    ]
+    if len(excluded):
+        lines.append(
+            f"- Excluded neighbourhoods hold **{smallest}** to "
+            f"**{int(excluded['listing_count'].max())}** listings each; "
+            f"{len(near_miss)} sit within 10 of the threshold "
+            f"({', '.join(f'{ix} ({int(r)})' for ix, r in near_miss['listing_count'].items())})."
+        )
+    else:
+        lines.append(
+            f"- Nothing is excluded: every neighbourhood in this dataset "
+            f"clears n >= {n}."
+        )
+    lines += [
         "",
         f"The exclusion trades {pct:.1f}% of listing volume for indicator "
         "stability. The retained neighbourhoods still cover "

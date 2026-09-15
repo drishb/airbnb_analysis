@@ -60,8 +60,8 @@ Three fields encode the same underlying fact — that a listing has never been r
 
 ## Structural caveats
 
-- Single cross-sectional snapshot, scraped approximately August 2020. No change over time is measurable.
+- Single cross-sectional snapshot, scraped approximately mid-2020. No change over time is measurable.
 - Scrape falls mid-pandemic. Inactivity figures reflect COVID conditions, not local market character.
-- Geographic coverage is Los Angeles County only, despite the filename.
+- Geographic coverage is LA County only (source file: `listings_California.csv`).
 - `availability_365 == 0` on **23.4%** of listings, and is ambiguous: fully booked, or host-blocked calendar.
-- `minimum_nights >= 30` on **32.1%** of listings. The spike at exactly 30 is a regulatory artifact, not an organic distribution.
+- `minimum_nights >= 30` on **32.1%** of listings, 7,974 of them at exactly 30. See `limitations.md` for whether a specific local ordinance is known to attach to that threshold in this market.

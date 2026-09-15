@@ -23,7 +23,7 @@ def load_raw(path=None) -> pd.DataFrame:
     if not path.exists():
         raise FileNotFoundError(
             f"Input CSV not found at {path}. "
-            f"Place listings_California.csv in {path.parent}/"
+            f"Place {path.name} in {path.parent}/"
         )
 
     df = pd.read_csv(path, parse_dates=["last_review"])
@@ -194,18 +194,35 @@ def quality_report(df_raw: pd.DataFrame, df_clean: pd.DataFrame, stats: dict) ->
         "",
         "## Structural caveats",
         "",
-        "- Single cross-sectional snapshot, scraped approximately August 2020. "
+        "- Single cross-sectional snapshot, scraped approximately mid-2020. "
         "No change over time is measurable.",
         "- Scrape falls mid-pandemic. Inactivity figures reflect COVID conditions, "
         "not local market character.",
-        "- Geographic coverage is Los Angeles County only, despite the filename.",
+        f"- Geographic coverage is {config.CITY_LABEL} only "
+        f"(source file: `{config.DATA_FILE.name}`).",
+    ]
+
+    replacement_chars = int(
+        df_raw["name"].fillna("").str.count("�").sum()
+        + df_raw["neighbourhood"].fillna("").astype(str).str.count("�").sum()
+    )
+    if replacement_chars:
+        lines.append(
+            f"- **{replacement_chars:,}** U+FFFD replacement characters found "
+            "in `name`/`neighbourhood` (e.g. accented characters lost to an "
+            "upstream lossy encoding before this file was produced). "
+            "Irrecoverable — reported, not corrected."
+        )
+
+    lines += [
         f"- `availability_365 == 0` on "
         f"**{100*(df_raw['availability_365']==0).mean():.1f}%** of listings, and is "
         "ambiguous: fully booked, or host-blocked calendar.",
         f"- `minimum_nights >= {config.LONG_STAY_THRESHOLD}` on "
         f"**{100*(df_raw['minimum_nights']>=config.LONG_STAY_THRESHOLD).mean():.1f}%** "
-        "of listings. The spike at exactly 30 is a regulatory artifact, not an "
-        "organic distribution.",
+        f"of listings, {int((df_raw['minimum_nights']==30).sum()):,} of them "
+        "at exactly 30. See `limitations.md` for whether a specific local "
+        "ordinance is known to attach to that threshold in this market.",
         "",
     ]
     return "\n".join(lines)

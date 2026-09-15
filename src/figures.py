@@ -279,10 +279,13 @@ def hexbin_density(df, name: str = "hexbin_listing_density.png"):
 def min_nights_histogram(df, name: str = "hist_minimum_nights.png"):
     """
     PRD req 16: histogram of `minimum_nights` capped at 90, annotated at the
-    non-organic spike at exactly 30 - a 30-night minimum exempts a listing
-    from LA's 2019 Home-Sharing Ordinance, so the spike is the
-    regulatory-evasion signal, not an organic distribution. `df` is the
-    cleaned listing frame.
+    spike at exactly 30. Whether that spike has a specific regulatory
+    meaning in this market is dataset-dependent - LA's is a verified
+    ordinance exemption; the annotation's second line is only shown when
+    `config.REGULATION_NOTE` documents a specific mechanism
+    (`config.HAS_NEIGHBOURHOOD_GROUP` also True for LA today, reused here
+    as the "this is the verified LA case" flag rather than adding a new
+    one). `df` is the cleaned listing frame.
     """
     capped = df["minimum_nights"].clip(upper=90)
     over_90 = int((df["minimum_nights"] > 90).sum())
@@ -292,18 +295,22 @@ def min_nights_histogram(df, name: str = "hist_minimum_nights.png"):
     ax.hist(capped, bins=range(0, 92), color="#3b528b", edgecolor="white",
             linewidth=0.3)
     ax.axvline(30, color="#d1495b", lw=1.2, ls="--")
+    label = f"spike at exactly 30 nights: {at_30:,} listings ({100 * at_30 / len(df):.1f}%)"
+    if config.HAS_NEIGHBOURHOOD_GROUP:
+        label += "\n— the Home-Sharing Ordinance exemption threshold"
     ax.annotate(
-        f"spike at exactly 30 nights: {at_30:,} listings "
-        f"({100 * at_30 / len(df):.1f}%)\n"
-        "— the Home-Sharing Ordinance exemption threshold",
+        label,
         xy=(30, at_30), xytext=(40, at_30 * 0.85),
         fontsize=8, color="0.2",
         arrowprops=dict(arrowstyle="->", color="0.4", lw=0.8),
     )
     ax.set_xlabel("minimum_nights (capped at 90)")
     ax.set_ylabel("listings")
-    ax.set_title("Minimum-nights distribution — regulatory-evasion signal "
-                 f"({over_90:,} listings above 90 not shown)")
+    title = "Minimum-nights distribution"
+    title += (" — regulatory-evasion signal" if config.HAS_NEIGHBOURHOOD_GROUP
+              else " — structural long-stay share (see limitations.md)")
+    title += f" ({over_90:,} listings above 90 not shown)"
+    ax.set_title(title)
     return save(fig, name)
 
 

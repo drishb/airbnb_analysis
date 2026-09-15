@@ -4,9 +4,9 @@ Family-weighted K-means over the **79** retained neighbourhoods (>= 100 listings
 
 ## Choosing k
 
-k was swept from 2 to 10 (`figures/elbow_silhouette.png`). The mean silhouette is low and nearly flat across the whole range (peak 0.19 at k=5) and the inertia curve bends only gently - 79 neighbourhoods described by 31 correlated indicators do not separate into tight, well-spaced groups. The choice therefore leans on interpretability rather than a decisive statistic.
+k was swept from 2 to 10 (`figures/elbow_silhouette.png`); the range may fall short of the usual 2-10 when there are few retained neighbourhoods (k-means requires k <= n_samples). Swept over **79** retained neighbourhoods and **31** engineered features (peak silhouette 0.19 at k=5).
 
-**k = 5** was selected: it sits at a local silhouette maximum (0.19, tied with k=2 for the best in the range), is where the inertia gain per extra cluster starts to shrink, yields five centroid profiles that each describe a recognisable market type, and coincides with the independently chosen NMF topic count. Larger k fragments the map into two- and three-neighbourhood clusters without raising the silhouette.
+**k = 5** was selected: it sits at a local silhouette maximum (0.19, tied with k=2 for the best in the range), is where the inertia gain per extra cluster starts to shrink, yields five centroid profiles that each describe a recognisable market type, and coincides with the independently chosen NMF topic count. Larger k fragments the map into two- and three-neighbourhood clusters without raising the silhouette. The shortfall against success metric 4's 0.25 bar is a property of the data, not the family weighting - unweighted standardised features peak at 0.20.
 
 | k | inertia | mean silhouette |
 |--:|--:|--:|
@@ -15,12 +15,12 @@ k was swept from 2 to 10 (`figures/elbow_silhouette.png`). The mean silhouette i
 | 4 | 387.3 | 0.167 |
 | 5 | 336.3 | 0.194  <- selected |
 | 6 | 304.8 | 0.165 |
-| 7 | 274.2 | 0.162 |
+| 7 | 274.1 | 0.162 |
 | 8 | 250.2 | 0.176 |
-| 9 | 238.6 | 0.166 |
-| 10 | 225.5 | 0.150 |
+| 9 | 238.1 | 0.162 |
+| 10 | 225.4 | 0.150 |
 
-> Success metric 4 sets a mean-silhouette bar of 0.25. The chosen solution scores **0.19**, below that bar. The shortfall is a property of the data, not the weighting (unweighted standardised features peak at 0.20), and is accepted: the segmentation is reported as a descriptive grouping, not a claim of sharp natural boundaries.
+> Success metric 4 sets a mean-silhouette bar of 0.25. The chosen solution scores **0.19** (below that bar).
 
 ## Cluster labels
 

@@ -8,8 +8,13 @@ The point of the requirement is that a downstream reader of the `outputs/`
 directory sees the constraints without having to open the PRD or the code.
 
 Where a figure in §10 is a property of the data ("7,118 nulls", "23.4%
-zeros") the number is recomputed from the cleaned frame so the report can
-never drift from the artefacts beside it.
+zeros") the number is recomputed from the cleaned frame - or, for §5's
+model/segmentation figures, from the fitted objects - so the report can
+never drift from the artefacts beside it. This matters more once the
+pipeline runs against more than one dataset (config.select_dataset):
+`write_limitations` takes the fitted regression/clustering objects as
+arguments precisely so it never has to hardcode a number that differs by
+dataset.
 """
 
 from . import aggregate, config
@@ -22,7 +27,7 @@ def _facts(df) -> dict:
     stale = df["last_review"].notna() & (
         df["last_review"] < config.COVID_CUTOFF
     )
-    return {
+    facts = {
         "n": n,
         "review_nulls": int(df["reviews_per_month"].isna().sum()),
         "review_null_pct": 100 * df["reviews_per_month"].isna().mean(),
@@ -32,33 +37,69 @@ def _facts(df) -> dict:
         "avail_zero_pct": 100 * (df["availability_365"] == 0).mean(),
         "min_nights_max": int(df["minimum_nights"].max()),
         "min30_pct": 100 * (df["minimum_nights"] >= 30).mean(),
-        "groups": ", ".join(sorted(df["neighbourhood_group"].unique())),
         "stale_pct_of_reviewed": 100 * stale[reviewed].mean(),
         "last_review_max": df["last_review"].max().date(),
     }
+    if config.HAS_NEIGHBOURHOOD_GROUP:
+        facts["groups"] = ", ".join(sorted(df["neighbourhood_group"].dropna().unique()))
+        facts["n_groups"] = df["neighbourhood_group"].nunique()
+    return facts
 
 
-def write_limitations(df, path=None) -> str:
-    """PRD req 67: `outputs/limitations.md`, every §10 item restated."""
+def write_limitations(df, tbl, results, diag, pca_result, sensitivity,
+                      path=None) -> str:
+    """PRD req 67: `outputs/limitations.md`, every §10 item restated.
+
+    `tbl`, `results`, `diag`, `pca_result`, `sensitivity` are the pipeline's
+    own fitted objects (the neighbourhood table, the hedonic regression
+    results, the k-selection diagnostics, the PCA robustness check, and the
+    threshold-sensitivity table) - §5's model/segmentation numbers are read
+    from them rather than hardcoded, so they are correct for whichever
+    dataset is active.
+    """
     f = _facts(df)
+    retained_n = int((~tbl["low_confidence"]).sum())
+    n_features = len(aggregate.feature_columns())
+    r2 = float(results.rsquared)
+    sil = float(diag.loc[config.CLUSTER_K, "silhouette"])
+    ari = float(pca_result["ari"])
+    sens_lo = float(sensitivity["pct_changed"].min())
+    sens_hi = float(sensitivity["pct_changed"].max())
+
+    if config.HAS_NEIGHBOURHOOD_GROUP:
+        group_row = (
+            f"| `neighbourhood_group` | only {f['n_groups']} values "
+            f"({f['groups']}) | Geographic coverage is {config.CITY_LABEL} "
+            f"only (source file `{config.DATA_FILE.name}`); the analysis "
+            "claims nothing wider. |"
+        )
+    else:
+        group_row = (
+            "| `neighbourhood_group` | entirely null in this snapshot | No "
+            "regional control term in the hedonic regression (req 43); the "
+            "neighbourhood-fixed-effects variant is the only "
+            "neighbourhood-level control available - see "
+            "`regression_summary.txt`. |"
+        )
 
     lines = [
         "# Limitations",
         "",
-        "This pipeline characterises LA County short-term-rental **market "
-        "structure at one point in time**. It is built on a single "
+        f"This pipeline characterises {config.CITY_LABEL} short-term-rental "
+        "**market structure at one point in time**. It is built on a single "
         f"cross-sectional Inside Airbnb snapshot ({f['n']:,} cleaned "
         f"listings, most recent review {f['last_review_max']}, scraped "
-        "~August 2020). Every constraint below is restated from the project "
-        "PRD (§7, §10) so it travels with the outputs.",
+        "~mid-2020, source file "
+        f"`{config.DATA_FILE.name}`). Every constraint below is restated "
+        "from the project PRD (§7, §10) so it travels with the outputs.",
         "",
         "## 1. No change over time can be measured",
         "",
         "There is one observation per listing and no earlier snapshot. Every "
         "ranking, cluster, and coefficient describes the market **as it was "
-        "in August 2020**, not a trajectory. Words like *gentrifying*, "
-        "*declining*, or *emerging* are not supportable from this data and "
-        "are not used in any output.",
+        "at the time of the scrape**, not a trajectory. Words like "
+        "*gentrifying*, *declining*, or *emerging* are not supportable from "
+        "this data and are not used in any output.",
         "",
         "## 2. The snapshot is mid-pandemic",
         "",
@@ -82,7 +123,7 @@ def write_limitations(df, path=None) -> str:
         "contributes no terms to TF-IDF / NMF. |",
         f"| `host_name` | {f['host_name_nulls']} nulls | Unused; host "
         "identity comes from `host_id`. |",
-        f"| `price` | 11 zeros; max ${f['price_max']:,.0f} | Zeros dropped "
+        f"| `price` | max ${f['price_max']:,.0f} | Zero-price rows dropped "
         "before any log transform (logged in the data-quality report). "
         "Winsorised at the 1st/99th percentile for modelling; raw value kept "
         "for description. |",
@@ -90,13 +131,12 @@ def write_limitations(df, path=None) -> str:
         "meaning | Reported per neighbourhood. The booked-days occupancy "
         "proxy is flagged unreliable wherever the zero share is high — a zero "
         "can mean fully booked or a host-blocked calendar. |",
-        f"| `minimum_nights` | max {f['min_nights_max']:,}; non-organic spike "
-        f"at exactly 30 ({f['min30_pct']:.1f}% at 30+) | The spike is treated "
-        "as the regulatory-evasion signal itself, not smoothed away. The "
-        "histogram is capped at 90 and annotated at 30. |",
-        f"| `neighbourhood_group` | only 3 values ({f['groups']}) | The "
-        'filename says "California"; the data is LA County only and the '
-        "analysis claims nothing wider. |",
+        f"| `minimum_nights` | max {f['min_nights_max']:,}; "
+        f"**{f['min30_pct']:.1f}%** at 30+ nights | See `regression_summary.txt` "
+        "/ the minimum-nights histogram caption for whether a specific local "
+        "ordinance is known to attach to the 30-night threshold in this "
+        "market. |",
+        group_row,
         "| Geometry | no boundary polygons in the CSV, no external files "
         "permitted | No choropleths. Centroid bubble maps (one marker per "
         "neighbourhood at its mean lat/long) and a hexbin over raw "
@@ -108,11 +148,11 @@ def write_limitations(df, path=None) -> str:
         "- **Revenue is an estimate, not a measurement.** Both variants use "
         "the Inside Airbnb occupancy model (reviews × 0.5 reviews-per-stay × "
         "nights × price). The **uncapped** variant multiplies by "
-        "`minimum_nights`, which inflates the figure for the ~32% of "
-        "listings at 30+ nights; the **capped** variant limits that "
-        "multiplier to 5. The two are reported as separate columns and are "
-        "**never summed or averaged together**. `excluded_neighbourhoods.md` "
-        "and `neighbourhood_indicators.csv` flag where they diverge most — "
+        "`minimum_nights`, which inflates the figure for listings with a "
+        "long minimum stay; the **capped** variant limits that multiplier "
+        "to 5. The two are reported as separate columns and are **never "
+        "summed or averaged together**. `excluded_neighbourhoods.md` and "
+        "`neighbourhood_indicators.csv` flag where they diverge most — "
         "those neighbourhoods' revenue figures are the least trustworthy.",
         "- **The 0.5 reviews-per-stay constant is taken as given** (the "
         "Inside Airbnb convention). Both revenue variants scale linearly in "
@@ -125,24 +165,31 @@ def write_limitations(df, path=None) -> str:
         "- **Price is right-skewed** (mean well above median, max "
         f"${f['price_max']:,.0f}). Modelling is on `log_price`; description "
         "uses medians, not means.",
+        f"- **The `tour_dist_coast_km_median` column measures distance to "
+        f"the {config.COASTLINE_LABEL}**, not necessarily an ocean coast — "
+        "see `COASTLINE_LABEL` in `src/config.py` for what it means in this "
+        "dataset.",
         "",
         "## 5. Model and segmentation caveats",
         "",
-        "- **Hedonic regression R² = 0.33**, below success metric 3's 0.35 "
-        "bar. The req-43 formula is fixed. A 264-neighbourhood "
-        "fixed-effects variant fits better (R² 0.48) but cannot carry the "
-        "mandated HC3 errors (single-listing neighbourhoods give leverage 1), "
-        "so it is reported only as a robustness note. See "
-        "`regression_summary.txt`.",
-        "- **Cluster mean silhouette ≈ 0.19**, below success metric 4's 0.25 "
-        "bar. 79 neighbourhoods described by 31 correlated indicators do not "
-        "form tight, well-separated groups. The segmentation is a "
-        "**descriptive grouping**, not a claim of natural boundaries, and "
-        "the family-weighted vs. PCA adjusted Rand index (~0.30) plus the "
-        "n = 50/100/200 threshold sensitivity (up to ~42% of common "
-        "neighbourhoods change cluster) say the same: the broad shape is "
-        "stable, mid-distribution membership is not. Treat individual "
-        "cluster membership near the n = 100 boundary as approximate.",
+        f"- **Hedonic regression R² = {r2:.2f}** "
+        f"({'meets' if r2 >= 0.35 else 'below'} success metric 3's 0.35 "
+        "bar). See `regression_summary.txt` for the full coefficient table "
+        "and the neighbourhood-fixed-effects robustness check (it typically "
+        "fits better but cannot carry the mandated HC3 standard errors — "
+        "single-listing neighbourhoods give those rows leverage 1).",
+        f"- **Cluster mean silhouette ≈ {sil:.2f}** "
+        f"({'meets' if sil >= 0.25 else 'below'} success metric 4's 0.25 "
+        f"bar), over **{retained_n}** retained neighbourhoods and "
+        f"**{n_features}** correlated indicators. The segmentation is "
+        "reported as a **descriptive grouping**, not a claim of natural "
+        f"boundaries. Family-weighted vs. PCA adjusted Rand index = "
+        f"**{ari:.2f}**; the n = 50/100/200 threshold sensitivity moves "
+        f"between **{sens_lo:.0f}%** and **{sens_hi:.0f}%** of common "
+        "neighbourhoods to a different cluster (see "
+        "`excluded_neighbourhoods.md` and `cluster_summary.md`) — treat "
+        "individual cluster membership near the n-threshold boundary as "
+        "approximate.",
         "- **Cluster labels are post-hoc**, assigned by reading the centroid "
         "table after fitting. They are summaries of a centroid profile, not "
         "inputs to the clustering.",
@@ -152,7 +199,7 @@ def write_limitations(df, path=None) -> str:
         "No census / ACS demographics, no rent indices, no permit or "
         "registration records, no other Airbnb snapshots. These are what a "
         "rigorous neighbourhood-change study would require; this deliverable "
-        "consumes exactly one file (`listings_California.csv`) and makes no "
+        f"consumes exactly one file (`{config.DATA_FILE.name}`) and makes no "
         "claim that would need them.",
         "",
     ]
@@ -165,20 +212,22 @@ def write_limitations(df, path=None) -> str:
 
 
 def write_success_metrics(tbl, results, diag, pca_result, cluster_labels,
-                          path=None) -> str:
+                          sensitivity, path=None) -> str:
     """
-    Task 8.8: check every success metric in PRD §8 and record pass/fail.
+    Task 8.8: check every success metric in PRD §8 and record pass or fail.
 
     Each row is evaluated against the live objects the pipeline just
     produced (or the artefacts on disk), not a remembered value, so the
-    report cannot drift. Two metrics — 3 (hedonic R² ≥ 0.35) and 4 (cluster
-    silhouette ≥ 0.25) — are known misses; the reasons are in
-    `regression_summary.txt` and `cluster_summary.md` and are repeated here.
+    report cannot drift and stays correct across datasets. Metrics 3
+    (hedonic R² ≥ 0.35) and 4 (cluster silhouette ≥ 0.25) are known LA
+    misses; whether they miss on another dataset is whatever the live
+    numbers below say.
     """
     out = config.OUTPUT_DIR
     feats = aggregate.feature_columns()
     retained = tbl[tbl["listing_count"] >= config.MIN_LISTINGS_PER_NEIGHBOURHOOD]
     retained_nulls = int(retained[feats].isna().sum().sum())
+    no_duplicate_rows = tbl.index.nunique() == len(tbl)
 
     sig = int((results.pvalues < 0.05).sum())
     total_coef = int(len(results.pvalues))
@@ -190,6 +239,12 @@ def write_success_metrics(tbl, results, diag, pca_result, cluster_labels,
     topic = (out / "topic_model.md").read_text(encoding="utf-8")
     lims = (out / "limitations.md").read_text(encoding="utf-8")
     n_figs = len(list(config.FIGURE_DIR.glob("*.png")))
+
+    excluded_n = int(tbl["low_confidence"].sum())
+    excluded_pct = 100 * tbl.loc[tbl["low_confidence"], "listing_count"].sum() \
+        / tbl["listing_count"].sum()
+    sens_lo = float(sensitivity["pct_changed"].min())
+    sens_hi = float(sensitivity["pct_changed"].max())
 
     # metric 10: re-export the table to a scratch path and compare bytes
     scratch = out / "_repro_check.csv"
@@ -208,30 +263,29 @@ def write_success_metrics(tbl, results, diag, pca_result, cluster_labels,
     checks = [
         ("1", "End-to-end from raw CSV, single command, zero manual steps",
          True,
-         "`python run_analysis.py` runs ingest → table → regression → "
-         "clustering → figures → reports with no intervention."),
-        ("2", "264 neighbourhoods, no unexpected nulls in indicator columns",
-         len(tbl) == 264 and retained_nulls == 0,
-         f"{len(tbl)} rows exported; {retained_nulls} nulls across the 31 "
-         "feature columns for the 79 retained neighbourhoods. The only "
-         "feature nulls anywhere are in 7 excluded single- or zero-review "
-         "neighbourhoods where the indicator (price Gini, tenure, revenue "
-         "median) is genuinely undefined — expected, not unexpected."),
+         "`python run_analysis.py [--dataset ...]` runs ingest → table → "
+         "regression → clustering → figures → reports with no "
+         "intervention."),
+        ("2", "Every neighbourhood in the table exactly once, no unexpected "
+         "nulls in indicator columns",
+         no_duplicate_rows and retained_nulls == 0,
+         f"{len(tbl)} rows exported, {tbl.index.nunique()} distinct "
+         f"neighbourhoods; {retained_nulls} nulls across the {len(feats)} "
+         f"feature columns for the {int((~tbl['low_confidence']).sum())} "
+         "retained neighbourhoods. Any feature nulls in excluded "
+         "neighbourhoods (genuinely undefined indicators, e.g. price Gini "
+         "on a single-listing area) are expected, not unexpected."),
         ("3", "Hedonic R² ≥ 0.35, majority of coefficients significant",
          r2 >= 0.35 and sig > total_coef / 2,
-         f"R² = {r2:.3f} — **below the 0.35 bar**. {sig} of {total_coef} "
-         "coefficients significant at p < 0.05 (that half is met). The "
-         "req-43 formula is fixed and the admissible-under-HC3 fixed-effects "
-         "variant cannot rescue it; miss accepted, see "
-         "`regression_summary.txt`."),
+         f"R² = {r2:.3f} ({'meets' if r2 >= 0.35 else '**below the 0.35 bar**'}). "
+         f"{sig} of {total_coef} coefficients significant at p < 0.05. "
+         "See `regression_summary.txt`."),
         ("4", "Clustering mean silhouette ≥ 0.25, every cluster labelable",
          sil >= 0.25 and len(cluster_labels) == config.CLUSTER_K,
-         f"Mean silhouette = {sil:.3f} at k = {config.CLUSTER_K} — **below "
-         f"the 0.25 bar**. All {len(cluster_labels)} clusters carry a "
-         "centroid-derived label a reader can match (guarded by "
-         "`clustering.label_clusters`). The silhouette shortfall is a "
-         "property of the data — unweighted features peak at 0.20 — and is "
-         "accepted, see `cluster_summary.md`."),
+         f"Mean silhouette = {sil:.3f} at k = {config.CLUSTER_K} "
+         f"({'meets' if sil >= 0.25 else '**below the 0.25 bar**'}). All "
+         f"{len(cluster_labels)} clusters carry a centroid-derived label "
+         "(guarded by `clustering.label_clusters`). See `cluster_summary.md`."),
         ("5", "Adjusted Rand index (family-weighted vs. PCA) reported",
          "ari" in pca_result,
          f"ARI = {pca_result['ari']:.3f}, reported in `cluster_summary.md` "
@@ -242,29 +296,27 @@ def write_success_metrics(tbl, results, diag, pca_result, cluster_labels,
                                  "(b) Mechanical HHI inflation",
                                  "(c) Clustering distortion",
                                  "Listings in excluded neighbourhoods"]),
-         "Full 185-row table, listing count removed (17.1%), and the three "
-         "stated reasons are all present."),
+         f"{excluded_n}-row excluded table, {excluded_pct:.1f}% of listings "
+         "removed, and the three stated reasons are all present."),
         ("7", "Threshold sensitivity at n = 50 / 100 / 200 reported",
          "Threshold sensitivity" in excl and "50" in excl and "200" in excl,
-         "Reported in `excluded_neighbourhoods.md`: 23–42% of common "
-         "neighbourhoods change cluster between thresholds — the choice is "
-         "load-bearing for the fine partition."),
+         f"Reported in `excluded_neighbourhoods.md`: {sens_lo:.0f}%–"
+         f"{sens_hi:.0f}% of common neighbourhoods change cluster between "
+         "thresholds."),
         ("8", "Derived topics labelled and compared to the tourism / "
          "upmarket / commercial hypothesis",
          "Hypothesis check" in topic,
-         "`topic_model.md` labels all 5 NMF topics and reports the "
-         "hypothesis overlap (mostly contradicted — near-zero tourism / "
-         "commercial term hits)."),
+         "`topic_model.md` labels every NMF topic and reports the "
+         "hypothesis overlap."),
         ("9", "All 10 figures render without manual adjustment, legible at "
          "print size",
          n_figs == 10,
-         f"{n_figs} PNGs in `outputs/figures/`, all at "
+         f"{n_figs} PNGs in `{config.FIGURE_DIR}`, all at "
          f"{config.FIGURE_DPI} dpi, produced in the single pipeline run."),
         ("10", "Repeated runs produce byte-identical CSV output",
          csv_identical,
          "A second in-run export of the neighbourhood table is byte-for-byte "
-         "equal to the written CSV; a full second `run_analysis.py` was also "
-         "verified byte-identical."),
+         "equal to the written CSV."),
         ("11", "limitations.md generated, contains every PRD §10 item",
          (out / "limitations.md").exists() and lims_ok,
          "Generated by `report.write_limitations`; every §10 field "
@@ -278,12 +330,8 @@ def write_success_metrics(tbl, results, diag, pca_result, cluster_labels,
     lines = [
         "# Success Metrics (PRD §8)",
         "",
-        f"**{n_pass} of {len(checks)} met.** The two misses — metric 3 "
-        "(hedonic R²) and metric 4 (cluster silhouette) — are known, "
-        "documented in the relevant output files, and accepted: the fixed "
-        "req-43 formula and the intrinsic weakness of the neighbourhood "
-        "separation respectively put them out of reach without violating "
-        "another requirement.",
+        f"**{n_pass} of {len(checks)} met.** Dataset: {config.CITY_LABEL} "
+        f"(`{config.ACTIVE_DATASET}`).",
         "",
         "| # | Metric | Verdict |",
         "|---|---|---|",

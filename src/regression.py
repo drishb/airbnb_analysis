@@ -8,9 +8,15 @@ aggregate, so the n>=100 neighbourhood exclusion does not apply here.
 This file grows through task 5.0: 5.1 builds the model frame (here),
 5.2 fits with HC3 errors, 5.3-5.4 write the summary, 5.5 plots
 diagnostics, 5.6 resolves the neighbourhood-fixed-effects question.
+
+Multi-dataset note: `neighbourhood_group` is 100% null in three of the
+four datasets this pipeline runs against (config.HAS_NEIGHBOURHOOD_GROUP).
+The formula and reference levels below are therefore built at call time
+from the live data rather than fixed as module constants — the reference
+level is always "whichever level/neighbourhood has the most listings",
+computed from `df`, not a hand-picked literal.
 """
 
-import re
 import textwrap
 
 import numpy as np
@@ -28,6 +34,7 @@ def _deterministic_summary(results) -> str:
     reason for this file to churn). Field widths are preserved so the
     column alignment of the summary block is untouched.
     """
+    import re
     text = str(results.summary())
     text = re.sub(r"(Date:\s+)\w{3}, \d{2} \w{3} \d{4}",
                   lambda m: m.group(1) + "(run date omitted)", text)
@@ -35,54 +42,65 @@ def _deterministic_summary(results) -> str:
                   lambda m: m.group(1) + "(omitted)", text)
     return text
 
+
 # PRD req 43: the model form is fixed. Categoricals carry an explicit
-# reference level so every coefficient reads as "versus this baseline"
-# and the mapping does not shift if the data's category counts change:
-#   - room_type      -> vs. "Entire home/apt" (the modal type)
-#   - neighbourhood_group -> vs. "City of Los Angeles" (the largest group)
-# The response is `log_price`, which ingest already defined as
-# log(price_winsorized) — winsorised per req 4 / PRD §7.3, so the 1%
-# tails do not lever the fit.
-FORMULA = (
-    'log_price ~ '
+# reference level so every coefficient reads as "versus this baseline" and
+# the mapping does not shift if the data's category counts change.
+_BASE_TERMS = (
     'C(room_type, Treatment(reference="Entire home/apt")) '
     '+ minimum_nights '
     '+ availability_365 '
     '+ calculated_host_listings_count '
-    '+ number_of_reviews '
-    '+ C(neighbourhood_group, Treatment(reference="City of Los Angeles"))'
+    '+ number_of_reviews'
 )
 
-# Task 5.6 / PRD §9 Q2: the neighbourhood-fixed-effects variant. Identical
-# to FORMULA except `neighbourhood_group` (3 levels) is replaced by
-# `neighbourhood` (264 levels) — the two are nested, so they are never in
-# the model together. Reference level = Venice, the largest neighbourhood
-# (1,700 listings), so each dummy reads as "vs. Venice" against a
-# well-estimated baseline. Patsy's alphabetical default would instead
-# anchor on a tiny neighbourhood, inflating every dummy's standard error.
-FE_REFERENCE_NEIGHBOURHOOD = "Venice"
-FORMULA_FE = (
-    'log_price ~ '
-    'C(room_type, Treatment(reference="Entire home/apt")) '
-    '+ minimum_nights '
-    '+ availability_365 '
-    '+ calculated_host_listings_count '
-    '+ number_of_reviews '
-    f'+ C(neighbourhood, Treatment(reference="{FE_REFERENCE_NEIGHBOURHOOD}"))'
-)
 
-MODEL_COLUMNS = [
-    "log_price",
-    "room_type",
-    "minimum_nights",
-    "availability_365",
-    "calculated_host_listings_count",
-    "number_of_reviews",
-    "neighbourhood_group",
-]
+def _largest_level(df: pd.DataFrame, col: str) -> str:
+    """The most-listed value of a categorical column - the reference level
+    a treatment coding should anchor on, so every dummy reads against a
+    well-estimated baseline rather than patsy's alphabetical default."""
+    return df[col].value_counts().idxmax()
 
-# The FE frame swaps the group column for the 264-level neighbourhood.
-MODEL_COLUMNS_FE = MODEL_COLUMNS[:-1] + ["neighbourhood"]
+
+def build_formula(df: pd.DataFrame) -> str:
+    """
+    PRD req 43 formula. Appends a `neighbourhood_group` term only when the
+    dataset has one (`config.HAS_NEIGHBOURHOOD_GROUP`) - it is entirely
+    null in three of the four datasets this pipeline supports, and fitting
+    `C()` on an all-null column drops every row. The reference level is the
+    largest group in the live data, not a hardcoded name.
+    """
+    formula = f'log_price ~ {_BASE_TERMS}'
+    if config.HAS_NEIGHBOURHOOD_GROUP:
+        ref = _largest_level(df, "neighbourhood_group")
+        formula += f' + C(neighbourhood_group, Treatment(reference="{ref}"))'
+    return formula
+
+
+def build_formula_fe(df: pd.DataFrame) -> str:
+    """
+    Task 5.6 / PRD §9 Q2: the neighbourhood-fixed-effects variant. Identical
+    to `build_formula` except the base formula's optional group term (if
+    any) is replaced by the full `neighbourhood` column - the two are
+    nested, so they are never in the model together. Reference level is the
+    largest neighbourhood in the live data (LA: Venice, 1,700 listings),
+    so each dummy reads as "vs. that neighbourhood" against a
+    well-estimated baseline rather than patsy's alphabetical default.
+    """
+    ref = _largest_level(df, "neighbourhood")
+    return f'log_price ~ {_BASE_TERMS} + C(neighbourhood, Treatment(reference="{ref}"))'
+
+
+def _model_columns(fixed_effects: bool) -> list[str]:
+    cols = [
+        "log_price", "room_type", "minimum_nights", "availability_365",
+        "calculated_host_listings_count", "number_of_reviews",
+    ]
+    if fixed_effects:
+        return cols + ["neighbourhood"]
+    if config.HAS_NEIGHBOURHOOD_GROUP:
+        return cols + ["neighbourhood_group"]
+    return cols
 
 
 def build_model_frame(df: pd.DataFrame, fixed_effects: bool = False) -> pd.DataFrame:
@@ -91,9 +109,10 @@ def build_model_frame(df: pd.DataFrame, fixed_effects: bool = False) -> pd.DataF
     every cleaned listing, the columns the formula references, no
     aggregation and no neighbourhood exclusion.
 
-    `fixed_effects=False` builds the req-43 frame (7 cols, uses
-    `neighbourhood_group`). `fixed_effects=True` builds the task-5.6
-    comparison frame, swapping in the 264-level `neighbourhood` column.
+    `fixed_effects=False` builds the req-43 frame (`neighbourhood_group`
+    included only when `config.HAS_NEIGHBOURHOOD_GROUP`).
+    `fixed_effects=True` builds the task-5.6 comparison frame, swapping in
+    the full-cardinality `neighbourhood` column.
 
     Raises if `log_price` is missing (ingest.clean must run first) or if
     any model column contains a null. None of the columns has nulls in the
@@ -101,7 +120,7 @@ def build_model_frame(df: pd.DataFrame, fixed_effects: bool = False) -> pd.DataF
     listings, and `reviews_per_month` — the only review field with nulls —
     is deliberately not in the model.
     """
-    columns = MODEL_COLUMNS_FE if fixed_effects else MODEL_COLUMNS
+    columns = _model_columns(fixed_effects)
     missing = [c for c in columns if c not in df.columns]
     if missing:
         raise ValueError(
@@ -124,7 +143,7 @@ def build_model_frame(df: pd.DataFrame, fixed_effects: bool = False) -> pd.DataF
     return frame
 
 
-def fit_model(frame: pd.DataFrame, formula: str = FORMULA):
+def fit_model(frame: pd.DataFrame, formula: str):
     """
     PRD req 44: OLS fit with heteroskedasticity-robust (HC3) standard
     errors. Price data is strongly heteroskedastic even after the log
@@ -135,8 +154,9 @@ def fit_model(frame: pd.DataFrame, formula: str = FORMULA):
     `.conf_int()` on the returned results are already the robust versions;
     the point estimates and R^2 are identical to a classical fit.
 
-    `formula` defaults to the req-43 form; pass `FORMULA_FE` for the
-    task-5.6 fixed-effects variant.
+    `formula` is built by `build_formula`/`build_formula_fe` — it depends
+    on the live data's reference levels, so there is no module-level
+    default.
 
     Returns the fitted `RegressionResultsWrapper` (used by 5.3-5.6).
     """
@@ -168,10 +188,9 @@ def percentage_effects(results) -> pd.DataFrame:
         the correct multiplicative effect for any beta.
 
     They agree to a fraction of a point for |beta| < ~0.1 and diverge
-    sharply above it: the room-type dummies run to beta = -1.62, where the
-    approximation is off by 30+ points. `exact_pct_effect` is the column
-    to read there. The confidence bounds (HC3) are carried through the
-    exact transform.
+    sharply above it. `exact_pct_effect` is the column to read for large
+    coefficients (e.g. room-type dummies). The confidence bounds (HC3) are
+    carried through the exact transform.
 
     `kind` says how to read each row: "per +1 unit" for the continuous
     predictors, "vs. reference" for the treatment-coded dummies. The
@@ -246,9 +265,9 @@ def _format_percentage_effects(pe: pd.DataFrame) -> str:
         "    approx % = 100 * beta          exact % = 100 * (exp(beta) - 1)",
         "",
         "The two agree while |beta| is small. Past |beta| ~ 0.2 the",
-        "approximation overstates the effect: read the exact column for the",
-        "room-type dummies (e.g. Private room is -60%, not -92%). CI bounds",
-        "are the HC3 interval carried through the exact transform.",
+        "approximation overstates the effect: read the exact column for large",
+        "coefficients (typically the room-type dummies). CI bounds are the",
+        "HC3 interval carried through the exact transform.",
         "'per +1 unit' rows are the effect of one more night / day / listing /",
         "review; 'vs. reference' rows are relative to the categorical baseline.",
         "",
@@ -258,11 +277,16 @@ def _format_percentage_effects(pe: pd.DataFrame) -> str:
     return "\n".join(lines)
 
 
-def write_summary(results, path=None) -> str:
+def write_summary(results, formula: str, path=None) -> str:
     """
     PRD req 45: the full coefficient table — coefficient, standard error,
     test statistic, p-value — plus R^2 and n, written to
     `outputs/regression_summary.txt`.
+
+    `formula` is the exact string the model was fit with (from
+    `build_formula`) — the reference levels it names are the live-data
+    ones, so printing the formula verbatim is the whole "which baseline"
+    answer; there is no separate reference-level table to keep in sync.
 
     The body is `statsmodels`' own summary. Because the fit uses a robust
     covariance, the per-coefficient statistic is the asymptotic **z**, not
@@ -282,18 +306,21 @@ def write_summary(results, path=None) -> str:
         "Standard errors: heteroskedasticity-robust (HC3), so the reported",
         "per-coefficient statistic is the asymptotic z.",
         "",
-        "Success metric 3 (R^2 >= 0.35): NOT MET. R^2 = 0.330 on the req-43",
-        "feature set. The 264-dummy fixed-effects variant clears the bar",
-        "(R^2 = 0.481) but is inadmissible under HC3 - see NEIGHBOURHOOD",
-        "FIXED EFFECTS below. The req-43 formula is fixed, so the miss is",
-        "accepted and recorded (task 5.6 decision).",
+        f"R^2 = {results.rsquared:.3f}, adjusted R^2 = {results.rsquared_adj:.3f} "
+        f"({'meets' if results.rsquared >= 0.35 else 'below'} success metric 3's "
+        "0.35 bar).",
+    ]
+    if not config.HAS_NEIGHBOURHOOD_GROUP:
+        header += [
+            "`neighbourhood_group` is entirely null in this dataset, so no",
+            "regional control term is included here — see NEIGHBOURHOOD FIXED",
+            "EFFECTS below for the only available neighbourhood-level control.",
+        ]
+    header += [
         "",
-        "Formula:",
-        f"  {FORMULA}",
-        "",
-        "Categorical reference levels (coefficients are relative to these):",
-        "  room_type            = Entire home/apt",
-        "  neighbourhood_group  = City of Los Angeles",
+        "Formula (Treatment(reference=...) names the baseline for each",
+        "categorical, computed from the live data — see build_formula):",
+        f"  {formula}",
         "",
         "=" * 78,
         "",
@@ -311,25 +338,15 @@ def write_summary(results, path=None) -> str:
     return text
 
 
-_FE_PREFIX = (
-    f'C(neighbourhood, Treatment(reference="{FE_REFERENCE_NEIGHBOURHOOD}"))[T.'
-)
-
-
-def _fe_neighbourhood(param_name: str) -> str:
-    """Strip the patsy wrapper: '...[T.Adams-Normandie]' -> 'Adams-Normandie'."""
-    return param_name[len(_FE_PREFIX):-1]
-
-
 def compare_neighbourhood_fixed_effects(df: pd.DataFrame, path=None) -> dict:
     """
-    Task 5.6 / PRD §9 open question 2: does the hedonic model want 264
-    neighbourhood dummies on top of the 3-level `neighbourhood_group`?
+    Task 5.6 / PRD §9 open question 2: does the hedonic model want full
+    neighbourhood dummies on top of (or in place of) `neighbourhood_group`?
 
-    Fits both — the req-43 model (`FORMULA`, HC3) and the fixed-effects
-    variant (`FORMULA_FE`, `neighbourhood_group` swapped for the 264-level
-    `neighbourhood`) — and compares R^2, adjusted R^2 (which charges for
-    the 261 extra parameters), AIC and BIC.
+    Fits both the req-43 model (`build_formula`, HC3) and the fixed-effects
+    variant (`build_formula_fe`, `neighbourhood_group` swapped for the
+    full-cardinality `neighbourhood` column) and compares R^2, adjusted R^2
+    (which charges for the extra parameters), AIC and BIC.
 
     It also checks whether the FE model can even carry the req-44 error
     type: HC3 divides by (1 - leverage)^2, and a neighbourhood with a
@@ -345,20 +362,22 @@ def compare_neighbourhood_fixed_effects(df: pd.DataFrame, path=None) -> dict:
     """
     path = path or (config.OUTPUT_DIR / "regression_summary.txt")
 
-    base = fit_model(build_model_frame(df, fixed_effects=False), formula=FORMULA)
+    base_formula = build_formula(df)
+    base = fit_model(build_model_frame(df, fixed_effects=False), formula=base_formula)
 
+    fe_formula = build_formula_fe(df)
+    fe_frame = build_model_frame(df, fixed_effects=True)
     # FE point estimates / R^2 / AIC come from a plain OLS fit; they do not
     # depend on the covariance choice. A second fit then tries HC3.
-    fe_frame = build_model_frame(df, fixed_effects=True)
-    fe = smf.ols(FORMULA_FE, data=fe_frame).fit()
-    fe_hc3 = smf.ols(FORMULA_FE, data=fe_frame).fit(cov_type="HC3")
+    fe = smf.ols(fe_formula, data=fe_frame).fit()
+    fe_hc3 = smf.ols(fe_formula, data=fe_frame).fit(cov_type="HC3")
     hc3_ok = bool(np.isfinite(fe_hc3.bse).all())
 
     counts = df["neighbourhood"].value_counts()
     singletons = sorted(counts[counts == 1].index)
     n_below_10 = int((counts < 10).sum())
 
-    dummies = [n for n in fe.params.index if n.startswith(_FE_PREFIX)]
+    dummies = [n for n in fe.params.index if n.startswith("C(neighbourhood,")]
     delta_adj = float(fe.rsquared_adj - base.rsquared_adj)
 
     # base is the req-43 model and stays primary: the FE spec cannot carry
@@ -381,26 +400,30 @@ def compare_neighbourhood_fixed_effects(df: pd.DataFrame, path=None) -> dict:
         "fe_is_primary": bool(fe_is_primary),
     }
 
+    base_desc = (
+        f"+ C(neighbourhood_group)  ({df['neighbourhood_group'].nunique()} "
+        "levels, HC3)" if config.HAS_NEIGHBOURHOOD_GROUP
+        else "(no regional control - neighbourhood_group is entirely null)"
+    )
+
     if fe_is_primary:
-        decision = (
-            "Neighbourhood fixed effects are the PRIMARY reported model."
-        )
+        decision = "Neighbourhood fixed effects are the PRIMARY reported model."
     else:
         decision = "\n".join(textwrap.wrap(
-            "The req-43 model (neighbourhood_group, HC3) stays the PRIMARY "
-            "reported model. The 264-dummy fixed-effects variant fits better "
-            f"(R^2 {base.rsquared:.3f} -> {fe.rsquared:.3f}, adjusted "
+            "The req-43 model stays the PRIMARY reported model. The "
+            f"{len(dummies)}-dummy fixed-effects variant fits better (R^2 "
+            f"{base.rsquared:.3f} -> {fe.rsquared:.3f}, adjusted "
             f"{base.rsquared_adj:.3f} -> {fe.rsquared_adj:.3f}), which says "
             "neighbourhood location carries real price signal beyond the "
-            "three groups. But it cannot be the reported model: "
-            f"{len(singletons)} neighbourhoods have a single listing, giving "
-            "those rows leverage 1 once their dummy enters the design, which "
-            "makes every HC3 standard error in the fit infinite. Requirement "
-            "44 mandates HC3, so the FE spec is inadmissible here. This is "
-            "PRD open question 2's over-parameterisation concern, concrete: "
-            "the small neighbourhoods that the n>=100 rule already excludes "
-            "from aggregation also break the listing-level model. The FE "
-            "result is retained below as a robustness note only.",
+            "base model's regional control. But it cannot be the reported "
+            f"model: {len(singletons)} neighbourhoods have a single listing, "
+            "giving those rows leverage 1 once their dummy enters the "
+            "design, which makes every HC3 standard error in the fit "
+            "infinite. Requirement 44 mandates HC3, so the FE spec is "
+            "inadmissible here. The small neighbourhoods that the n>=100 "
+            "rule already excludes from aggregation also break the "
+            "listing-level model. The FE result is retained below as a "
+            "robustness note only.",
             width=78,
         ))
 
@@ -412,8 +435,8 @@ def compare_neighbourhood_fixed_effects(df: pd.DataFrame, path=None) -> dict:
         "=" * 78,
         "",
         "Same listing-level model, two neighbourhood controls:",
-        "  base : + C(neighbourhood_group)   (3 levels,  HC3)",
-        "  FE   : + C(neighbourhood)          (264 levels, 263 dummies)",
+        f"  base : {base_desc}",
+        f"  FE   : + C(neighbourhood)  ({len(dummies)} dummies)",
         "",
         "                         base            FE",
         f"  n                {int(base.nobs):>10d}    {int(fe.nobs):>10d}",

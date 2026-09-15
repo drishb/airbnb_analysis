@@ -1,0 +1,118 @@
+HEDONIC LOG-PRICE REGRESSION
+==============================================================================
+
+PRD req 43-48. Listing-level OLS over every cleaned listing — no
+neighbourhood exclusion (req 48). Response: log(price_winsorized),
+winsorised at the 1st/99th percentile per req 4.
+Standard errors: heteroskedasticity-robust (HC3), so the reported
+per-coefficient statistic is the asymptotic z.
+
+R^2 = 0.255, adjusted R^2 = 0.255 (below success metric 3's 0.35 bar).
+`neighbourhood_group` is entirely null in this dataset, so no
+regional control term is included here — see NEIGHBOURHOOD FIXED
+EFFECTS below for the only available neighbourhood-level control.
+
+Formula (Treatment(reference=...) names the baseline for each
+categorical, computed from the live data — see build_formula):
+  log_price ~ C(room_type, Treatment(reference="Entire home/apt")) + minimum_nights + availability_365 + calculated_host_listings_count + number_of_reviews
+
+==============================================================================
+                            OLS Regression Results                            
+==============================================================================
+Dep. Variable:              log_price   R-squared:                       0.255
+Model:                            OLS   Adj. R-squared:                  0.255
+Method:                 Least Squares   F-statistic:                     1813.
+Date:                (run date omitted)   Prob (F-statistic):               0.00
+Time:                        (omitted)   Log-Likelihood:                -47875.
+No. Observations:               35724   AIC:                         9.577e+04
+Df Residuals:                   35716   BIC:                         9.583e+04
+Df Model:                           7                                         
+Covariance Type:                  HC3                                         
+========================================================================================================================================
+                                                                           coef    std err          z      P>|z|      [0.025      0.975]
+----------------------------------------------------------------------------------------------------------------------------------------
+Intercept                                                                6.1132      0.009    705.396      0.000       6.096       6.130
+C(room_type, Treatment(reference="Entire home/apt"))[T.Hotel room]      -0.5248      0.110     -4.762      0.000      -0.741      -0.309
+C(room_type, Treatment(reference="Entire home/apt"))[T.Private room]    -0.9058      0.011    -85.289      0.000      -0.927      -0.885
+C(room_type, Treatment(reference="Entire home/apt"))[T.Shared room]     -1.2406      0.037    -33.606      0.000      -1.313      -1.168
+minimum_nights                                                           0.0003      0.000      1.024      0.306      -0.000       0.001
+availability_365                                                      4.738e-05   3.27e-05      1.449      0.147   -1.67e-05       0.000
+calculated_host_listings_count                                           0.0071      0.000     52.884      0.000       0.007       0.007
+number_of_reviews                                                       -0.0084      0.000    -36.308      0.000      -0.009      -0.008
+==============================================================================
+Omnibus:                     2658.876   Durbin-Watson:                   1.690
+Prob(Omnibus):                  0.000   Jarque-Bera (JB):             3371.324
+Skew:                           0.687   Prob(JB):                         0.00
+Kurtosis:                       3.613   Cond. No.                     3.36e+03
+==============================================================================
+
+Notes:
+[1] Standard Errors are heteroscedasticity robust (HC3)
+[2] The condition number is large, 3.36e+03. This might indicate that there are
+strong multicollinearity or other numerical problems.
+
+
+==============================================================================
+PERCENTAGE PRICE EFFECTS (PRD req 47)
+==============================================================================
+
+The coefficients above are shifts in log(price). Re-expressed as
+effects on price:
+    approx % = 100 * beta          exact % = 100 * (exp(beta) - 1)
+
+The two agree while |beta| is small. Past |beta| ~ 0.2 the
+approximation overstates the effect: read the exact column for large
+coefficients (typically the room-type dummies). CI bounds are the
+HC3 interval carried through the exact transform.
+'per +1 unit' rows are the effect of one more night / day / listing /
+review; 'vs. reference' rows are relative to the categorical baseline.
+
+                                                                                  kind coef(log) approx %  exact % exact % lo exact % hi
+Intercept                                                             (baseline level)    6.1132      -        -          -          -  
+C(room_type, Treatment(reference="Entire home/apt"))[T.Hotel room]       vs. reference   -0.5248   -52.48   -40.83     -52.32     -26.57
+C(room_type, Treatment(reference="Entire home/apt"))[T.Private room]     vs. reference   -0.9058   -90.58   -59.58     -60.41     -58.73
+C(room_type, Treatment(reference="Entire home/apt"))[T.Shared room]      vs. reference   -1.2406  -124.06   -71.08     -73.10     -68.91
+minimum_nights                                                             per +1 unit    0.0003     0.03     0.03      -0.03       0.10
+availability_365                                                           per +1 unit    0.0000     0.00     0.00      -0.00       0.01
+calculated_host_listings_count                                             per +1 unit    0.0071     0.71     0.71       0.68       0.74
+number_of_reviews                                                          per +1 unit   -0.0084    -0.84    -0.84      -0.88      -0.79
+
+
+==============================================================================
+NEIGHBOURHOOD FIXED EFFECTS  (task 5.6 / PRD open question 2)
+==============================================================================
+
+Same listing-level model, two neighbourhood controls:
+  base : (no regional control - neighbourhood_group is entirely null)
+  FE   : + C(neighbourhood)  (155 dummies)
+
+                         base            FE
+  n                     35724         35724
+  parameters                8           163
+  R^2                   0.255         0.321
+  adjusted R^2          0.255         0.318
+  AIC                   95767         92769
+  BIC                   95835         94152
+
+  adjusted R^2 change with FE: +0.063
+  R^2 >= 0.35 (success metric 3): base misses, FE misses
+
+FE feasibility under HC3 (requirement 44):
+  neighbourhoods with 1 listing : 8  (Campo dos Afonsos, Cavalcanti, Gericinó, Jacarezinho, Jardim América, Maré, Parque Colúmbia, Vista Alegre)
+  neighbourhoods with < 10      : 58
+  all HC3 standard errors finite: True
+  A single-listing neighbourhood's dummy fits that row exactly,
+  so leverage = 1 and HC3's 1/(1-h)^2 weight is undefined. Every
+  HC3 SE in the FE fit is therefore infinite.
+
+DECISION
+------------------------------------------------------------------------------
+The req-43 model stays the PRIMARY reported model. The 155-dummy fixed-effects
+variant fits better (R^2 0.255 -> 0.321, adjusted 0.255 -> 0.318), which says
+neighbourhood location carries real price signal beyond the base model's
+regional control. But it cannot be the reported model: 8 neighbourhoods have a
+single listing, giving those rows leverage 1 once their dummy enters the
+design, which makes every HC3 standard error in the fit infinite. Requirement
+44 mandates HC3, so the FE spec is inadmissible here. The small neighbourhoods
+that the n>=100 rule already excludes from aggregation also break the listing-
+level model. The FE result is retained below as a robustness note only.

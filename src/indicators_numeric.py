@@ -219,9 +219,11 @@ def compute_all(df: pd.DataFrame) -> pd.DataFrame:
         out = out.join(p, how="outer")
 
     out.insert(0, "listing_count", df.groupby("neighbourhood").size())
+    # mode() of an all-null group returns empty rather than raising - happens
+    # in every dataset where neighbourhood_group is unused (config.HAS_NEIGHBOURHOOD_GROUP).
     out.insert(1, "neighbourhood_group",
                df.groupby("neighbourhood")["neighbourhood_group"].agg(
-                   lambda s: s.mode().iat[0]))
+                   lambda s: s.mode().iat[0] if not s.mode().empty else np.nan))
     out.insert(2, "centroid_lat", df.groupby("neighbourhood")["latitude"].mean())
     out.insert(3, "centroid_lon", df.groupby("neighbourhood")["longitude"].mean())
     return out

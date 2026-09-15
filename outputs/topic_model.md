@@ -3,14 +3,14 @@
 ## Baseline vocabulary
 
 - Vocabulary: 1482 terms (unigrams + bigrams, min_df=20)
-- Selected k = **8** by UMass coherence (-3.1441), margin over runner-up 0.0155
+- Selected k = **8** by UMass coherence (-3.1440), margin over runner-up 0.0124
 
 | k | coherence | reconstruction error |
 |---:|---:|---:|
-| 5 | -3.2500 | 173.61 |
-| 6 | -3.1596 | 172.75 |
-| 7 | -3.2539 | 171.94 |
-| 8 | -3.1441 | 171.15 |
+| 5 | -3.2498 | 173.61 |
+| 6 | -3.1564 | 172.74 |
+| 7 | -3.2537 | 171.94 |
+| 8 | -3.1440 | 171.15 |
 
 | Topic | Top terms |
 |---:|---|
@@ -61,6 +61,6 @@ Sensitivity to `min_df` (topic-set Jaccard vs. the min_df=20 fit):
 
 |   min_df |   vocabulary |   mean_topic_overlap |   min_topic_overlap |
 |---------:|-------------:|---------------------:|--------------------:|
-|       10 |         1649 |             0.679654 |            0.428571 |
+|       10 |         1646 |             0.679654 |            0.428571 |
 |       20 |          855 |             1        |            1        |
 |       50 |          360 |             0.727273 |            0.666667 |

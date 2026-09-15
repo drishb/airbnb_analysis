@@ -133,10 +133,21 @@ def k_diagnostics(weighted: pd.DataFrame) -> pd.DataFrame:
 
     `weighted` is the family-weighted feature matrix. Returns a frame
     indexed by k with columns `inertia` and `silhouette`.
+
+    k is clamped to at most `len(weighted) - 1` - K-means requires
+    n_clusters <= n_samples, and a thin dataset (e.g. Antwerp's 7 retained
+    neighbourhoods) can fall well short of `config.CLUSTER_K_RANGE`'s
+    default ceiling of 10.
     """
     X = weighted.values
+    k_range = [k for k in config.CLUSTER_K_RANGE if k <= len(weighted) - 1]
+    if not k_range:
+        raise ValueError(
+            f"only {len(weighted)} retained neighbourhoods - too few to "
+            f"sweep any k in {config.CLUSTER_K_RANGE}"
+        )
     rows = {}
-    for k in config.CLUSTER_K_RANGE:
+    for k in k_range:
         labels = _kmeans(k).fit(X)
         rows[k] = {
             "inertia": float(labels.inertia_),
@@ -146,8 +157,8 @@ def k_diagnostics(weighted: pd.DataFrame) -> pd.DataFrame:
     diag.index.name = "k"
 
     best = diag["silhouette"].idxmax()
-    print(f"[clustering] k sweep {config.CLUSTER_K_RANGE[0]}.."
-          f"{config.CLUSTER_K_RANGE[-1]}: best silhouette {diag.loc[best, 'silhouette']:.3f} "
+    print(f"[clustering] k sweep {k_range[0]}.."
+          f"{k_range[-1]}: best silhouette {diag.loc[best, 'silhouette']:.3f} "
           f"at k={best}; selected k={config.CLUSTER_K}")
     return diag
 
@@ -262,12 +273,25 @@ def label_clusters(centroids: pd.DataFrame) -> dict[int, str]:
     evidence is recorded beside it in config.
 
     Because the labels are keyed by the cluster id the fixed seed produces,
-    this function guards them: it checks that each cluster's defining
-    feature still points at the id its label assumes, and raises if the fit
-    has drifted - a wrong label is worse than a loud failure.
+    `config.CLUSTER_LABEL_GUARDS` checks that each cluster's defining
+    feature still points at the id its label assumes, and this raises if
+    the fit has drifted - a wrong label is worse than a loud failure. Each
+    guard is `(feature, "idxmax"|"idxmin", expected_cluster_id)`.
+
+    If `config.CLUSTER_LABELS` is empty - a new dataset whose centroids
+    have not been inspected and labelled yet - this returns placeholder
+    `"Cluster N"` labels instead of raising, so an exploratory run can
+    still produce a real centroid table to label from (task 6.7 workflow,
+    done once per dataset).
 
     Returns `{cluster_id: label}`.
     """
+    if not config.CLUSTER_LABELS:
+        placeholder = {int(cid): f"Cluster {cid}" for cid in centroids.index}
+        print("[clustering] no labels configured for this dataset yet - "
+              f"placeholder labels: {placeholder}")
+        return placeholder
+
     if set(centroids.index) != set(config.CLUSTER_LABELS):
         raise ValueError(
             f"cluster ids {sorted(centroids.index)} do not match "
@@ -277,14 +301,7 @@ def label_clusters(centroids: pd.DataFrame) -> dict[int, str]:
 
     # Each check: "the cluster that is the argmax/argmin on this feature
     # must be the id whose hand-written label describes it."
-    guards = {
-        "reg_min_nights_median": ("idxmax", 0),   # long-stay core
-        "price_gini": ("idxmax", 3),              # upmarket = most unequal
-        "host_hhi": ("idxmax", 2),                # Avalon, single operator
-        "n_neighbourhoods": ("idxmin", 2),        # Avalon, alone
-        "tenure_months_median": ("idxmax", 4),    # high-turnover, long-tenured
-    }
-    for feature, (op, expected_id) in guards.items():
+    for feature, op, expected_id in config.CLUSTER_LABEL_GUARDS:
         got = getattr(centroids[feature], op)()
         if got != expected_id:
             raise ValueError(
@@ -293,12 +310,6 @@ def label_clusters(centroids: pd.DataFrame) -> dict[int, str]:
                 f'("{config.CLUSTER_LABELS[expected_id]}"). The fit drifted - '
                 "re-inspect the centroids and update config.CLUSTER_LABELS."
             )
-    # cluster 1 = lowest median price, by elimination the outer-suburban one
-    if centroids["price_median"].idxmin() != 1:
-        raise ValueError(
-            "label guard failed: cheapest cluster is not id 1 - "
-            "re-inspect config.CLUSTER_LABELS."
-        )
 
     print(f"[clustering] labels assigned post-hoc: "
           + "; ".join(f"{i}={lab}" for i, lab in config.CLUSTER_LABELS.items()))
@@ -334,22 +345,21 @@ def write_summary(centroids: pd.DataFrame, labels: dict[int, str],
         "",
         "## Choosing k",
         "",
-        f"k was swept from {config.CLUSTER_K_RANGE[0]} to "
-        f"{config.CLUSTER_K_RANGE[-1]} (`figures/elbow_silhouette.png`). "
-        "The mean silhouette is low and nearly flat across the whole range "
-        f"(peak {diag['silhouette'].max():.2f} at k={best_k}) and the inertia "
-        "curve bends only gently - 79 neighbourhoods described by 31 "
-        "correlated indicators do not separate into tight, well-spaced "
-        "groups. The choice therefore leans on interpretability rather than "
-        "a decisive statistic.",
+        f"k was swept from {diag.index.min()} to {diag.index.max()} "
+        "(`figures/elbow_silhouette.png`); the range may fall short of the "
+        f"usual {config.CLUSTER_K_RANGE[0]}-{config.CLUSTER_K_RANGE[-1]} "
+        "when there are few retained neighbourhoods (k-means requires "
+        "k <= n_samples). Swept over "
+        f"**{len(assignments)}** retained neighbourhoods and "
+        f"**{len(centroids.columns) - _n_meta(centroids)}** engineered "
+        f"features (peak silhouette {diag['silhouette'].max():.2f} at k="
+        f"{best_k}).",
         "",
-        f"**k = {k}** was selected: it sits at a local silhouette maximum "
-        f"({sil_k:.2f}, tied with k=2 for the best in the range), is where "
-        "the inertia gain per extra cluster starts to shrink, yields five "
-        "centroid profiles that each describe a recognisable market type, "
-        "and coincides with the independently chosen NMF topic count. "
-        "Larger k fragments the map into two- and three-neighbourhood "
-        "clusters without raising the silhouette.",
+        f"**k = {k}** was selected"
+        + (f": {config.CLUSTER_K_JUSTIFICATION}"
+           if config.CLUSTER_K_JUSTIFICATION else
+           " — justification not yet written for this dataset "
+           "(placeholder/exploratory run); see the k-sweep table below."),
         "",
         "| k | inertia | mean silhouette |",
         "|--:|--:|--:|",
@@ -363,11 +373,8 @@ def write_summary(centroids: pd.DataFrame, labels: dict[int, str],
     lines += [
         "",
         f"> Success metric 4 sets a mean-silhouette bar of 0.25. The chosen "
-        f"solution scores **{sil_k:.2f}**, below that bar. The shortfall is a "
-        "property of the data, not the weighting (unweighted standardised "
-        "features peak at 0.20), and is accepted: the segmentation is "
-        "reported as a descriptive grouping, not a claim of sharp natural "
-        "boundaries.",
+        f"solution scores **{sil_k:.2f}** "
+        f"({'meets' if sil_k >= 0.25 else 'below'} that bar).",
         "",
         "## Cluster labels",
         "",
@@ -418,12 +425,10 @@ def write_summary(centroids: pd.DataFrame, labels: dict[int, str],
         "§7.1). Adjusted Rand index between that solution and the "
         f"family-weighted one: **{pca_result['ari']:.3f}**.",
         "",
-        "That is partial agreement. The central long-stay cluster and the "
-        "Avalon singleton are stable across both methods; the split among "
-        "the outer-suburban, upmarket, and inner-tourist groups is "
-        "method-sensitive, consistent with the weak silhouette. The broad "
-        "shape of the segmentation holds; the exact partition of the middle "
-        "of the distribution should not be over-read.",
+        (config.PCA_ARI_NOTE if config.PCA_ARI_NOTE else
+         "Interpretation not yet written for this dataset (placeholder/"
+         "exploratory run) - compare the two solutions' cluster membership "
+         "by eye once real labels exist."),
         "",
     ]
 
@@ -440,10 +445,19 @@ def _n_meta(centroids: pd.DataFrame) -> int:
     return sum(c in centroids.columns for c in ("n_neighbourhoods", "n_listings"))
 
 
-def _cluster_at_threshold(tbl: pd.DataFrame, threshold: int, k: int) -> pd.Series:
-    """Full standardise -> family-weight -> K-means pipeline at one
-    listing-count threshold. Returns the label Series."""
+def _cluster_at_threshold(tbl: pd.DataFrame, threshold: int, k: int) -> pd.Series | None:
+    """
+    Full standardise -> family-weight -> K-means pipeline at one
+    listing-count threshold. Returns the label Series, or None if fewer
+    than k neighbourhoods clear the threshold - k-means requires
+    n_samples >= k, and a thin dataset (e.g. Antwerp has only 1
+    neighbourhood at n >= 200) can fail that at the stricter thresholds.
+    """
     frame = aggregate.feature_frame(tbl, threshold=threshold)
+    if len(frame) < max(k, 2):
+        print(f"[clustering] threshold {threshold}: only {len(frame)} "
+              f"retained neighbourhoods, fewer than k={k} - skipped")
+        return None
     weighted = family_weight(standardize(frame))
     _, labels = fit_kmeans(weighted, k=k)
     return labels
@@ -484,10 +498,11 @@ def threshold_sensitivity(tbl: pd.DataFrame, thresholds=None,
     k = config.CLUSTER_K if k is None else k
 
     labels = {t: _cluster_at_threshold(tbl, t, k) for t in thresholds}
+    usable = [t for t in thresholds if labels[t] is not None]
 
-    pairs = list(zip(thresholds, thresholds[1:]))
-    if len(thresholds) > 2:
-        pairs.append((thresholds[0], thresholds[-1]))
+    pairs = list(zip(usable, usable[1:]))
+    if len(usable) > 2:
+        pairs.append((usable[0], usable[-1]))
 
     rows = []
     for lo, hi in pairs:

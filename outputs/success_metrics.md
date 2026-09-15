@@ -1,11 +1,11 @@
 # Success Metrics (PRD §8)
 
-**9 of 11 met.** The two misses — metric 3 (hedonic R²) and metric 4 (cluster silhouette) — are known, documented in the relevant output files, and accepted: the fixed req-43 formula and the intrinsic weakness of the neighbourhood separation respectively put them out of reach without violating another requirement.
+**9 of 11 met.** Dataset: LA County (`la`).
 
 | # | Metric | Verdict |
 |---|---|---|
 | 1 | End-to-end from raw CSV, single command, zero manual steps | PASS |
-| 2 | 264 neighbourhoods, no unexpected nulls in indicator columns | PASS |
+| 2 | Every neighbourhood in the table exactly once, no unexpected nulls in indicator columns | PASS |
 | 3 | Hedonic R² ≥ 0.35, majority of coefficients significant | FAIL |
 | 4 | Clustering mean silhouette ≥ 0.25, every cluster labelable | FAIL |
 | 5 | Adjusted Rand index (family-weighted vs. PCA) reported | PASS |
@@ -20,19 +20,19 @@
 
 ### 1. End-to-end from raw CSV, single command, zero manual steps — PASS
 
-`python run_analysis.py` runs ingest → table → regression → clustering → figures → reports with no intervention.
+`python run_analysis.py [--dataset ...]` runs ingest → table → regression → clustering → figures → reports with no intervention.
 
-### 2. 264 neighbourhoods, no unexpected nulls in indicator columns — PASS
+### 2. Every neighbourhood in the table exactly once, no unexpected nulls in indicator columns — PASS
 
-264 rows exported; 0 nulls across the 31 feature columns for the 79 retained neighbourhoods. The only feature nulls anywhere are in 7 excluded single- or zero-review neighbourhoods where the indicator (price Gini, tenure, revenue median) is genuinely undefined — expected, not unexpected.
+264 rows exported, 264 distinct neighbourhoods; 0 nulls across the 31 feature columns for the 79 retained neighbourhoods. Any feature nulls in excluded neighbourhoods (genuinely undefined indicators, e.g. price Gini on a single-listing area) are expected, not unexpected.
 
 ### 3. Hedonic R² ≥ 0.35, majority of coefficients significant — FAIL
 
-R² = 0.330 — **below the 0.35 bar**. 10 of 10 coefficients significant at p < 0.05 (that half is met). The req-43 formula is fixed and the admissible-under-HC3 fixed-effects variant cannot rescue it; miss accepted, see `regression_summary.txt`.
+R² = 0.330 (**below the 0.35 bar**). 10 of 10 coefficients significant at p < 0.05. See `regression_summary.txt`.
 
 ### 4. Clustering mean silhouette ≥ 0.25, every cluster labelable — FAIL
 
-Mean silhouette = 0.194 at k = 5 — **below the 0.25 bar**. All 5 clusters carry a centroid-derived label a reader can match (guarded by `clustering.label_clusters`). The silhouette shortfall is a property of the data — unweighted features peak at 0.20 — and is accepted, see `cluster_summary.md`.
+Mean silhouette = 0.194 at k = 5 (**below the 0.25 bar**). All 5 clusters carry a centroid-derived label (guarded by `clustering.label_clusters`). See `cluster_summary.md`.
 
 ### 5. Adjusted Rand index (family-weighted vs. PCA) reported — PASS
 
@@ -40,23 +40,23 @@ ARI = 0.298, reported in `cluster_summary.md` with interpretation.
 
 ### 6. excluded_neighbourhoods.md: every excluded neighbourhood, total listings removed, all three reasons — PASS
 
-Full 185-row table, listing count removed (17.1%), and the three stated reasons are all present.
+185-row excluded table, 17.1% of listings removed, and the three stated reasons are all present.
 
 ### 7. Threshold sensitivity at n = 50 / 100 / 200 reported — PASS
 
-Reported in `excluded_neighbourhoods.md`: 23–42% of common neighbourhoods change cluster between thresholds — the choice is load-bearing for the fine partition.
+Reported in `excluded_neighbourhoods.md`: 23%–42% of common neighbourhoods change cluster between thresholds.
 
 ### 8. Derived topics labelled and compared to the tourism / upmarket / commercial hypothesis — PASS
 
-`topic_model.md` labels all 5 NMF topics and reports the hypothesis overlap (mostly contradicted — near-zero tourism / commercial term hits).
+`topic_model.md` labels every NMF topic and reports the hypothesis overlap.
 
 ### 9. All 10 figures render without manual adjustment, legible at print size — PASS
 
-10 PNGs in `outputs/figures/`, all at 150 dpi, produced in the single pipeline run.
+10 PNGs in `D:\1coding\thesis\airbnb\outputs\figures`, all at 150 dpi, produced in the single pipeline run.
 
 ### 10. Repeated runs produce byte-identical CSV output — PASS
 
-A second in-run export of the neighbourhood table is byte-for-byte equal to the written CSV; a full second `run_analysis.py` was also verified byte-identical.
+A second in-run export of the neighbourhood table is byte-for-byte equal to the written CSV.
 
 ### 11. limitations.md generated, contains every PRD §10 item — PASS
 

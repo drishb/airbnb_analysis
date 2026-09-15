@@ -11,24 +11,23 @@ Stage order is dependency order (req 65):
            -> maps and charts
            -> limitations.md
 
-Every artefact lands in `outputs/` (req 66). All randomness is seeded in
+Every artefact lands in `outputs/` (req 66; `outputs-<dataset>/` for
+non-default datasets, see `--dataset`). All randomness is seeded in
 `set_seeds` plus the fixed `random_state` on every sklearn estimator
-(req 69), so repeated runs produce byte-identical CSV output.
+(req 69), so repeated runs of the same dataset produce byte-identical CSV
+output.
+
+`--dataset` selects which of `config.DATASETS` to run (default `la`,
+preserving the original single-dataset behaviour). It must be applied
+before any other project module runs, since every module reads
+dataset-specific values as plain `config.X` attributes.
 """
+import argparse
 import random
 
 import numpy as np
 
-from src import (
-    aggregate,
-    clustering,
-    config,
-    figures,
-    indicators_text,
-    ingest,
-    regression,
-    report,
-)
+from src import config
 
 
 def set_seeds():
@@ -40,6 +39,22 @@ def set_seeds():
 
 
 def main():
+    parser = argparse.ArgumentParser(description=__doc__)
+    parser.add_argument(
+        "--dataset", choices=sorted(config.DATASETS), default="la",
+        help="which Inside Airbnb snapshot to run (default: la)",
+    )
+    args = parser.parse_args()
+    config.select_dataset(args.dataset)
+
+    # Imported after select_dataset so nothing reads a stale default - none
+    # of these modules touch dataset-specific config at import time today,
+    # but keeping the import here removes that as a future footgun.
+    from src import (
+        aggregate, clustering, figures, indicators_text, ingest, regression,
+        report,
+    )
+
     set_seeds()
     config.OUTPUT_DIR.mkdir(parents=True, exist_ok=True)
     config.FIGURE_DIR.mkdir(parents=True, exist_ok=True)
@@ -56,8 +71,9 @@ def main():
 
     # --- hedonic price regression (req 43-48) ----------------------
     frame = regression.build_model_frame(df)
-    results = regression.fit_model(frame)
-    regression.write_summary(results)                        # truncates the file
+    formula = regression.build_formula(df)
+    results = regression.fit_model(frame, formula)
+    regression.write_summary(results, formula)                # truncates the file
     regression.compare_neighbourhood_fixed_effects(df)       # appends (order matters)
     figures.residual_diagnostics(results)                    # req 46
 
@@ -97,7 +113,7 @@ def main():
         legend_label="30-night-minimum share", name="map_min_nights_30.png")
     figures.centroid_bubble_map(
         retained, labels,
-        title="Neighbourhood clusters (family-weighted K-means, k=5)",
+        title=f"Neighbourhood clusters (family-weighted K-means, k={config.CLUSTER_K})",
         legend_label="cluster", name="map_clusters.png",
         categorical=True, category_labels=cluster_labels)
 
@@ -106,8 +122,9 @@ def main():
     figures.revenue_capped_vs_uncapped(retained)             # req 22
 
     # --- limitations + success-metric check (req 67, task 8.8) ---
-    report.write_limitations(df)
-    report.write_success_metrics(tbl, results, diag, pca_result, cluster_labels)
+    report.write_limitations(df, tbl, results, diag, pca_result, sensitivity)
+    report.write_success_metrics(
+        tbl, results, diag, pca_result, cluster_labels, sensitivity)
 
     print("[run] pipeline complete — all artefacts in", config.OUTPUT_DIR)
     return df

@@ -46,24 +46,6 @@ def _df(n=500):
     )
 
 
-# --- write_limitations (req 67) --------------------------------------
-
-
-def test_limitations_covers_every_section_10_field():
-    text = report.write_limitations(_df())
-    for field in ["last_review", "reviews_per_month", "`name`", "host_name",
-                  "`price`", "availability_365", "minimum_nights",
-                  "neighbourhood_group", "Geometry", "cross-section"]:
-        assert field in text, f"limitations.md missing §10 field: {field}"
-
-
-def test_limitations_is_deterministic():
-    df = _df()
-    a = report.write_limitations(df)
-    b = report.write_limitations(df)
-    assert a == b
-
-
 # --- write_success_metrics (task 8.8) -------------------------------
 
 
@@ -78,6 +60,14 @@ def _tbl():
     tbl.insert(1, "low_confidence", tbl["listing_count"] < 100)
     tbl.insert(2, "neighbourhood_group", "City of Los Angeles")
     return tbl
+
+
+def _sensitivity():
+    return pd.DataFrame([
+        {"threshold_low": 50, "threshold_high": 100, "n_common": 79, "n_changed": 18, "pct_changed": 22.8},
+        {"threshold_low": 100, "threshold_high": 200, "n_common": 45, "n_changed": 18, "pct_changed": 40.0},
+        {"threshold_low": 50, "threshold_high": 200, "n_common": 45, "n_changed": 19, "pct_changed": 42.2},
+    ])
 
 
 def _seed_output_files(out):
@@ -106,15 +96,40 @@ def _fakes(r2, sil):
     return results, diag, pca_result, labels
 
 
+# --- write_limitations (req 67) --------------------------------------
+
+
+def test_limitations_covers_every_section_10_field():
+    tbl = _tbl()
+    results, diag, pca_result, _ = _fakes(r2=0.33, sil=0.19)
+    text = report.write_limitations(_df(), tbl, results, diag, pca_result, _sensitivity())
+    for field in ["last_review", "reviews_per_month", "`name`", "host_name",
+                  "`price`", "availability_365", "minimum_nights",
+                  "neighbourhood_group", "Geometry", "cross-section"]:
+        assert field in text, f"limitations.md missing §10 field: {field}"
+
+
+def test_limitations_is_deterministic():
+    df = _df()
+    tbl = _tbl()
+    results, diag, pca_result, _ = _fakes(r2=0.33, sil=0.19)
+    sensitivity = _sensitivity()
+    a = report.write_limitations(df, tbl, results, diag, pca_result, sensitivity)
+    b = report.write_limitations(df, tbl, results, diag, pca_result, sensitivity)
+    assert a == b
+
+
 def test_success_metrics_all_pass_when_thresholds_met(_outputs_to_tmp):
     out = _outputs_to_tmp
     tbl = _tbl()
     aggregate.export_table(tbl)
     _seed_output_files(out)
-    report.write_limitations(_df())
-
     results, diag, pca_result, labels = _fakes(r2=0.40, sil=0.30)
-    text = report.write_success_metrics(tbl, results, diag, pca_result, labels)
+    sensitivity = _sensitivity()
+    report.write_limitations(_df(), tbl, results, diag, pca_result, sensitivity)
+
+    text = report.write_success_metrics(
+        tbl, results, diag, pca_result, labels, sensitivity)
 
     assert "11 of 11 met" in text
     assert "FAIL" not in text
@@ -126,10 +141,12 @@ def test_success_metrics_flags_r2_and_silhouette_misses(_outputs_to_tmp):
     tbl = _tbl()
     aggregate.export_table(tbl)
     _seed_output_files(out)
-    report.write_limitations(_df())
-
     results, diag, pca_result, labels = _fakes(r2=0.33, sil=0.19)
-    text = report.write_success_metrics(tbl, results, diag, pca_result, labels)
+    sensitivity = _sensitivity()
+    report.write_limitations(_df(), tbl, results, diag, pca_result, sensitivity)
+
+    text = report.write_success_metrics(
+        tbl, results, diag, pca_result, labels, sensitivity)
 
     assert "9 of 11 met" in text
     # metrics 3 and 4 are the FAIL rows
