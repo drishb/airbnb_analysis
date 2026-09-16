@@ -1,6 +1,6 @@
 # Success Metrics (PRD §8)
 
-**9 of 11 met.** Dataset: LA County (`la`).
+**8 of 11 met.** Dataset: LA County (`la`).
 
 | # | Metric | Verdict |
 |---|---|---|
@@ -12,7 +12,7 @@
 | 6 | excluded_neighbourhoods.md: every excluded neighbourhood, total listings removed, all three reasons | PASS |
 | 7 | Threshold sensitivity at n = 50 / 100 / 200 reported | PASS |
 | 8 | Derived topics labelled and compared to the tourism / upmarket / commercial hypothesis | PASS |
-| 9 | All 10 figures render without manual adjustment, legible at print size | PASS |
+| 9 | All 10 figures render without manual adjustment, legible at print size | FAIL |
 | 10 | Repeated runs produce byte-identical CSV output | PASS |
 | 11 | limitations.md generated, contains every PRD §10 item | PASS |
 
@@ -50,9 +50,9 @@ Reported in `excluded_neighbourhoods.md`: 23%–42% of common neighbourhoods cha
 
 `topic_model.md` labels every NMF topic and reports the hypothesis overlap.
 
-### 9. All 10 figures render without manual adjustment, legible at print size — PASS
+### 9. All 10 figures render without manual adjustment, legible at print size — FAIL
 
-10 PNGs in `D:\1coding\thesis\airbnb\outputs\figures`, all at 150 dpi, produced in the single pipeline run.
+12 PNGs in `D:\1coding\thesis\airbnb\outputs\figures`, all at 150 dpi, produced in the single pipeline run.
 
 ### 10. Repeated runs produce byte-identical CSV output — PASS
 

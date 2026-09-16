@@ -3,8 +3,8 @@ All matplotlib output. PRD requirements 16, 22, 46, 57-60.
 
 Every figure this project emits goes through `save()` here, so all ten
 share one look: viridis for continuous indicators, a categorical map for
-clusters, 150 dpi PNG, and the fixed caption from `config.FIGURE_CAPTION`
-noting the ~August 2020 snapshot and the pandemic caveat (req 61, PRD §6).
+clusters, 150 dpi PNG, and the place name (`config.CITY_LABEL`) captioned
+beneath the axes (req 61, PRD §6).
 
 The module forces the non-interactive "Agg" backend on import so the
 pipeline renders with no display and no network (req 64).
@@ -17,8 +17,6 @@ This file grows through the project:
   7.5  min_nights_histogram       - minimum_nights capped at 90 (req 16)
   7.6  revenue_capped_vs_uncapped - per-neighbourhood revenue scatter (req 22)
 """
-
-import textwrap
 
 import numpy as np
 import matplotlib
@@ -45,28 +43,18 @@ plt.rcParams.update(
     }
 )
 
-_CAPTION_WIDTH = 110  # characters per wrapped caption line
-
-
-def save(fig, name: str, caption: str | None = None, dpi: int | None = None):
+def save(fig, name: str, dpi: int | None = None):
     """
-    Attach the standard caption, write `outputs/figures/<name>` as PNG at
+    Attach the place-name caption, write `outputs/figures/<name>` as PNG at
     >=150 dpi (req 60), close the figure, and return the path.
-
-    `caption` overrides `config.FIGURE_CAPTION` only when a figure needs an
-    extra note (e.g. the inactivity charts, req 36) - the base caveat text
-    is always included by the caller passing `config.FIGURE_CAPTION + ...`.
     """
-    text = caption or config.FIGURE_CAPTION
-    wrapped = "\n".join(textwrap.wrap(text, width=_CAPTION_WIDTH))
-
     # Reserve space under the axes so the caption never overlaps the plot;
     # bbox_inches="tight" then trims the surrounding whitespace back.
-    fig.subplots_adjust(bottom=0.22)
+    fig.subplots_adjust(bottom=0.15)
     fig.text(
         0.5,
-        0.015,
-        wrapped,
+        0.04,
+        config.CITY_LABEL,
         ha="center",
         va="bottom",
         fontsize=7,

@@ -198,12 +198,6 @@ def _la() -> dict:
         FIGURE_DIR=PROJECT_ROOT / "outputs" / "figures",
         CITY_LABEL="LA County",
         HAS_NEIGHBOURHOOD_GROUP=True,
-        FIGURE_CAPTION=(
-            "Inside Airbnb snapshot of LA County, scraped ~August 2020. "
-            "Single cross-section: shows market structure at one point in time, not change. "
-            "Scraped mid-pandemic — 44.7% of reviewed listings had no review since March 2020, "
-            "so activity and inactivity measures reflect COVID conditions, not baseline demand."
-        ),
         LANDMARKS=landmarks,
         # Simplified LA County shoreline, north-west to south-east. 11
         # vertices; straight-line segments stay within ~1 km of the true
@@ -324,14 +318,6 @@ def _antwerp() -> dict:
         FIGURE_DIR=PROJECT_ROOT / "outputs-antwerp" / "figures",
         CITY_LABEL="Antwerp",
         HAS_NEIGHBOURHOOD_GROUP=False,
-        FIGURE_CAPTION=(
-            "Inside Airbnb snapshot of Antwerp, scraped ~mid-2020 (filename "
-            "says \"Belgium\"; coverage is the city of Antwerp only). "
-            "Single cross-section: shows market structure at one point in "
-            "time, not change. Scraped mid-pandemic, so activity and "
-            "inactivity measures may reflect COVID-19 conditions rather "
-            "than baseline demand."
-        ),
         LANDMARKS=landmarks,
         # Antwerp has no ocean coastline - it sits on the river Scheldt.
         # This polyline follows the Scheldt's east bank through the city
@@ -448,14 +434,6 @@ def _amsterdam() -> dict:
         FIGURE_DIR=PROJECT_ROOT / "outputs-amsterdam" / "figures",
         CITY_LABEL="Amsterdam",
         HAS_NEIGHBOURHOOD_GROUP=False,
-        FIGURE_CAPTION=(
-            "Inside Airbnb snapshot of Amsterdam, scraped ~mid-2020 "
-            "(filename says \"Netherlands\"; coverage is the city of "
-            "Amsterdam only). Single cross-section: shows market structure "
-            "at one point in time, not change. Scraped mid-pandemic, so "
-            "activity and inactivity measures may reflect COVID-19 "
-            "conditions rather than baseline demand."
-        ),
         LANDMARKS=landmarks,
         # Amsterdam's real North Sea coast is ~20 km away (Zandvoort) and
         # is not central to intra-city market structure. The IJ
@@ -574,13 +552,6 @@ def _rio() -> dict:
         FIGURE_DIR=PROJECT_ROOT / "outputs-rio" / "figures",
         CITY_LABEL="Rio de Janeiro",
         HAS_NEIGHBOURHOOD_GROUP=False,
-        FIGURE_CAPTION=(
-            "Inside Airbnb snapshot of Rio de Janeiro, scraped ~mid-2020. "
-            "Single cross-section: shows market structure at one point in "
-            "time, not change. Scraped mid-pandemic, so activity and "
-            "inactivity measures may reflect COVID-19 conditions rather "
-            "than baseline demand."
-        ),
         LANDMARKS=landmarks,
         # Real Atlantic Ocean / Guanabara Bay coastline - the closest LA
         # analogue of the three new cities. West (Recreio) to north-east

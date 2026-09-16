@@ -1,0 +1,128 @@
+HEDONIC LOG-PRICE REGRESSION
+==============================================================================
+
+PRD req 43-48. Listing-level OLS over every cleaned listing — no
+neighbourhood exclusion (req 48). Response: log(price_winsorized),
+winsorised at the 1st/99th percentile per req 4.
+Standard errors: heteroskedasticity-robust (HC3), so the reported
+per-coefficient statistic is the asymptotic z.
+
+Success metric 3 (R^2 >= 0.35): NOT MET. R^2 = 0.330 on the req-43
+feature set. The 264-dummy fixed-effects variant clears the bar
+(R^2 = 0.481) but is inadmissible under HC3 - see NEIGHBOURHOOD
+FIXED EFFECTS below. The req-43 formula is fixed, so the miss is
+accepted and recorded (task 5.6 decision).
+
+Formula:
+  log_price ~ C(room_type, Treatment(reference="Entire home/apt")) + minimum_nights + availability_365 + calculated_host_listings_count + number_of_reviews + C(neighbourhood_group, Treatment(reference="City of Los Angeles"))
+
+Categorical reference levels (coefficients are relative to these):
+  room_type            = Entire home/apt
+  neighbourhood_group  = City of Los Angeles
+
+==============================================================================
+                            OLS Regression Results                            
+==============================================================================
+Dep. Variable:              log_price   R-squared:                       0.330
+Model:                            OLS   Adj. R-squared:                  0.329
+Method:                 Least Squares   F-statistic:                     1907.
+Date:                (run date omitted)   Prob (F-statistic):               0.00
+Time:                        (omitted)   Log-Likelihood:                -35467.
+No. Observations:               33067   AIC:                         7.095e+04
+Df Residuals:                   33057   BIC:                         7.104e+04
+Df Model:                           9                                         
+Covariance Type:                  HC3                                         
+==============================================================================================================================================================
+                                                                                                 coef    std err          z      P>|z|      [0.025      0.975]
+--------------------------------------------------------------------------------------------------------------------------------------------------------------
+Intercept                                                                                      5.1308      0.009    595.200      0.000       5.114       5.148
+C(room_type, Treatment(reference="Entire home/apt"))[T.Hotel room]                            -0.4312      0.054     -8.052      0.000      -0.536      -0.326
+C(room_type, Treatment(reference="Entire home/apt"))[T.Private room]                          -0.9184      0.008   -115.275      0.000      -0.934      -0.903
+C(room_type, Treatment(reference="Entire home/apt"))[T.Shared room]                           -1.6216      0.020    -79.483      0.000      -1.662      -1.582
+C(neighbourhood_group, Treatment(reference="City of Los Angeles"))[T.Other Cities]             0.0181      0.009      2.101      0.036       0.001       0.035
+C(neighbourhood_group, Treatment(reference="City of Los Angeles"))[T.Unincorporated Areas]    -0.0920      0.015     -6.190      0.000      -0.121      -0.063
+minimum_nights                                                                                -0.0015      0.000     -6.291      0.000      -0.002      -0.001
+availability_365                                                                               0.0007   2.87e-05     24.146      0.000       0.001       0.001
+calculated_host_listings_count                                                                -0.0015      0.000    -11.176      0.000      -0.002      -0.001
+number_of_reviews                                                                             -0.0015   5.14e-05    -29.561      0.000      -0.002      -0.001
+==============================================================================
+Omnibus:                     6950.812   Durbin-Watson:                   1.837
+Prob(Omnibus):                  0.000   Jarque-Bera (JB):            15059.388
+Skew:                           1.221   Prob(JB):                         0.00
+Kurtosis:                       5.228   Cond. No.                     3.36e+03
+==============================================================================
+
+Notes:
+[1] Standard Errors are heteroscedasticity robust (HC3)
+[2] The condition number is large, 3.36e+03. This might indicate that there are
+strong multicollinearity or other numerical problems.
+
+
+==============================================================================
+PERCENTAGE PRICE EFFECTS (PRD req 47)
+==============================================================================
+
+The coefficients above are shifts in log(price). Re-expressed as
+effects on price:
+    approx % = 100 * beta          exact % = 100 * (exp(beta) - 1)
+
+The two agree while |beta| is small. Past |beta| ~ 0.2 the
+approximation overstates the effect: read the exact column for the
+room-type dummies (e.g. Private room is -60%, not -92%). CI bounds
+are the HC3 interval carried through the exact transform.
+'per +1 unit' rows are the effect of one more night / day / listing /
+review; 'vs. reference' rows are relative to the categorical baseline.
+
+                                                                                                        kind coef(log) approx %  exact % exact % lo exact % hi
+Intercept                                                                                   (baseline level)    5.1308      -        -          -          -  
+C(room_type, Treatment(reference="Entire home/apt"))[T.Hotel room]                             vs. reference   -0.4312   -43.12   -35.03     -41.50     -27.84
+C(room_type, Treatment(reference="Entire home/apt"))[T.Private room]                           vs. reference   -0.9184   -91.84   -60.09     -60.70     -59.46
+C(room_type, Treatment(reference="Entire home/apt"))[T.Shared room]                            vs. reference   -1.6216  -162.16   -80.24     -81.02     -79.44
+C(neighbourhood_group, Treatment(reference="City of Los Angeles"))[T.Other Cities]             vs. reference    0.0181     1.81     1.83       0.12       3.56
+C(neighbourhood_group, Treatment(reference="City of Los Angeles"))[T.Unincorporated Areas]     vs. reference   -0.0920    -9.20    -8.79     -11.41      -6.09
+minimum_nights                                                                                   per +1 unit   -0.0015    -0.15    -0.15      -0.20      -0.10
+availability_365                                                                                 per +1 unit    0.0007     0.07     0.07       0.06       0.08
+calculated_host_listings_count                                                                   per +1 unit   -0.0015    -0.15    -0.15      -0.18      -0.13
+number_of_reviews                                                                                per +1 unit   -0.0015    -0.15    -0.15      -0.16      -0.14
+
+
+==============================================================================
+NEIGHBOURHOOD FIXED EFFECTS  (task 5.6 / PRD open question 2)
+==============================================================================
+
+Same listing-level model, two neighbourhood controls:
+  base : + C(neighbourhood_group)   (3 levels,  HC3)
+  FE   : + C(neighbourhood)          (264 levels, 263 dummies)
+
+                         base            FE
+  n                     33067         33067
+  parameters               10           271
+  R^2                   0.330         0.481
+  adjusted R^2          0.329         0.477
+  AIC                   70953         62995
+  BIC                   71037         65273
+
+  adjusted R^2 change with FE: +0.148
+  R^2 >= 0.35 (success metric 3): base misses, FE meets
+
+FE feasibility under HC3 (requirement 44):
+  neighbourhoods with 1 listing : 7  (Cudahy, Hawaiian Gardens, Lake Hughes, Northwest Antelope Valley, Ridge Route, South Diamond Bar, Whittier Narrows)
+  neighbourhoods with < 10      : 55
+  all HC3 standard errors finite: False
+  A single-listing neighbourhood's dummy fits that row exactly,
+  so leverage = 1 and HC3's 1/(1-h)^2 weight is undefined. Every
+  HC3 SE in the FE fit is therefore infinite.
+
+DECISION
+------------------------------------------------------------------------------
+The req-43 model (neighbourhood_group, HC3) stays the PRIMARY reported model.
+The 264-dummy fixed-effects variant fits better (R^2 0.330 -> 0.481, adjusted
+0.329 -> 0.477), which says neighbourhood location carries real price signal
+beyond the three groups. But it cannot be the reported model: 7 neighbourhoods
+have a single listing, giving those rows leverage 1 once their dummy enters
+the design, which makes every HC3 standard error in the fit infinite.
+Requirement 44 mandates HC3, so the FE spec is inadmissible here. This is PRD
+open question 2's over-parameterisation concern, concrete: the small
+neighbourhoods that the n>=100 rule already excludes from aggregation also
+break the listing-level model. The FE result is retained below as a robustness
+note only.
